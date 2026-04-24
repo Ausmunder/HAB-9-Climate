@@ -9,7 +9,7 @@ views:
           - type: horizontal-stack
             cards:
               - type: custom:mushroom-entity-card
-                entity: input_boolean.ventilation_pulse_mode
+                entity: input_boolean.system_enabled
                 name: VPD SYSTEM
                 icon: mdi:one-up
                 icon_color: green
@@ -20,7 +20,7 @@ views:
                     ha-card {
                       height: 100% !important;
                       box-sizing: border-box;
-                      background: {% if is_state('input_boolean.ventilation_pulse_mode', 'on') %}
+                      background: {% if is_state('input_boolean.system_enabled', 'on') %}
                         linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)
                       {% else %}
                         linear-gradient(135deg, #C62828 0%, #8E0000 100%)

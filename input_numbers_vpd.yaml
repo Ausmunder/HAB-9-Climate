@@ -1,24 +1,6 @@
 # VPD Control System - Input Numbers
-# Ventilasjons-pulsstyring
 # ACH-definisjon: 1 ACH = 120s på-tid = én komplett luftutskifting (empirisk målt)
-# ACH-target styrer frekvens (n ganger/time). Off-tid = (3600/ACH) - on_duration (beregnes av timer)
-ventilation_on_duration_pinning:
-  name: Ventilation ON Duration (Pinning)
-  min: 60
-  max: 150
-  step: 5
-  unit_of_measurement: "s"
-  icon: mdi:fan-clock
-  initial: 120
-
-ventilation_on_duration_fruiting:
-  name: Ventilation ON Duration (Fruiting)
-  min: 60
-  max: 150
-  step: 5
-  unit_of_measurement: "s"
-  icon: mdi:fan-clock
-  initial: 120
+# Fan ON-tid er hardkodet 120s. Off-tid = (3600/ACH) - 120 (beregnes i automations).
 
 # VPD-styring (DYNAMISK) - Optimalisert for 15°C/17°C
 target_vpd_pinning:

@@ -1,10 +1,49 @@
-# VPD Control System v3 - Changelog
+# HAB-9 Climate - Changelog
 
 All notable changes to this project are documented in this file.
 
 ---
 
-## [3.7.0] - 2026-04-24
+## [1.0.0] - 2026-04-24
+
+### Breaking Changes — HAB-9 Architecture Refactor
+Complete rewrite based on VPD-home v3.7.0. All critical reliability issues fixed.
+
+#### Part 1: Bug Fixes
+- **Timer-based fan control** — removed `delay:`-based `ventilation_timer_v4`.
+  New: `ventilation_cycle_end` + `fan_on_timer_end` use `timer.fan_on` (120s).
+  Fan always turns off when timer fires, even after HA reload.
+- **Deterministic fogger control loop** — removed `vpd_control_fogger_burst_v3`,
+  `vpd_fog_after_ventilation`, and `vpd_control__emergency_stop_v3`.
+  New: `fogger_control_loop` (30s time_pattern): VPD > target+hyst → ON, VPD < target-hyst → OFF.
+  No race conditions, no delay artefacts.
+- **Hardcoded 120s fan ON time** — removed `ventilation_on_duration_pinning` and
+  `ventilation_on_duration_fruiting` input_number entities. Fan ON time is 120s everywhere.
+- **Merged ACH sync** — replaced `ach_sync_pinning` + `ach_sync_fruiting` with single `ach_sync`.
+
+#### Part 2: Architecture
+- **`input_boolean.system_enabled`** replaces `input_boolean.ventilation_pulse_mode`
+  (renamed in all YAML files, dashboard, and scripts).
+- **Single startup automation** (`system_startup`) replaces `safety_fan_off_on_ha_start`
+  + `startup_sensor_availability_check`. Hardware OFF → 60s → sensor check → auto-enable.
+- **`system_start` / `system_stop`** replace `ventilation_pulse_start` +
+  `ventilation_pulse_stop_v2` + `vpd_system_disable_automations`.
+- **New timer**: `timer.fan_on` (120s) added to `timer_vpd.yaml`.
+
+#### Part 3: Cleanup
+- Removed 11 complex analytics template sensors: `vpd_stability_score`,
+  `humidity_control_efficiency`, `humidifier_runtime_percent`, `temperature_drift_rate`,
+  `ach_actual_current`, `climate_health_score`, `dynamic_rh_setpoint`, `ach_actual_calculated`,
+  `chamber_stability_index`, `health_score_24h_mean`, `vpd_stability_24h_mean`.
+- Removed `climate_health_critical_alert` automation (depended on removed sensor).
+- Removed legacy files: `automations_vpd.yaml`, `configuration_vpd_template.yaml`.
+- Renamed `automations_vpd_v3.yaml` → `automations.yaml`.
+
+### Net automation count: 51 → 46 (12 removed, 7 added)
+
+---
+
+## [3.7.0] - 2026-04-24 (VPD-home, basis for HAB-9)
 
 ### Added
 - **Ventilation: Timer Idle Watchdog (Lag 3)** (`automation.ventilation_timer_idle_watchdog`)

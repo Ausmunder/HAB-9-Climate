@@ -2,6 +2,12 @@
 ventilation_cycle:
   name: Ventilation Cycle Timer
   icon: mdi:timer-outline
+  restore: true
+
+fan_on:
+  name: Fan ON Timer
+  icon: mdi:fan-clock
+  restore: true
 
 pinning_phase_countdown:
   name: Pinning Phase Auto-Return

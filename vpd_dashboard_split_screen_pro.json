@@ -19,7 +19,7 @@
                   "cards": [
                     {
                       "type": "custom:mushroom-entity-card",
-                      "entity": "input_boolean.ventilation_pulse_mode",
+                      "entity": "input_boolean.system_enabled",
                       "name": "VPD SYSTEM",
                       "icon": "mdi:one-up",
                       "icon_color": "green",
@@ -27,7 +27,7 @@
                         "action": "toggle"
                       },
                       "card_mod": {
-                        "style": "ha-card {\n  height: 100% !important;\n  box-sizing: border-box;\n  background: {% if is_state('input_boolean.ventilation_pulse_mode', 'on') %}\n    linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)\n  {% else %}\n    linear-gradient(135deg, #C62828 0%, #8E0000 100%)\n  {% endif %} !important;\n  color: white;\n}\n"
+                        "style": "ha-card {\n  height: 100% !important;\n  box-sizing: border-box;\n  background: {% if is_state('input_boolean.system_enabled', 'on') %}\n    linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)\n  {% else %}\n    linear-gradient(135deg, #C62828 0%, #8E0000 100%)\n  {% endif %} !important;\n  color: white;\n}\n"
                       }
                     },
                     {

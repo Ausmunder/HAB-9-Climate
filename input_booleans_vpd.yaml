@@ -1,9 +1,9 @@
 # VPD Control System - Input Booleans
 
-# Aktivere/deaktivere pulsmodus
-ventilation_pulse_mode:
-  name: Ventilation Pulse Mode
-  icon: mdi:fan-auto
+# Master system ON/OFF switch
+system_enabled:
+  name: System Enabled
+  icon: mdi:power-cycle
   initial: false
 
 # Pinning vs Fruiting fase
