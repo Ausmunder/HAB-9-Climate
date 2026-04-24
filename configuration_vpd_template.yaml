@@ -1,0 +1,470 @@
+# MUSHROOM CHAMBER - CONFIGURATION.YAML v3.0 FINAL + STATISTICS
+# Basert på faktiske entities i ditt HA
+# ═══════════════════════════════════════════════════════════════════════════════
+
+template:
+  - sensor:
+      # ─────────────────────────────────────────────────────────────────────────
+      # BASE SENSORS (EKSISTERER ALLEREDE)
+      # ─────────────────────────────────────────────────────────────────────────
+      
+      # Average Temperature (from 2 sensors)
+      - name: "Chamber Avg Temp"
+        unique_id: chamber_avg_temp
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        state: >
+          {% set t1 = states('sensor.kammeret_temperature') | float(0) %}
+          {% set t2 = states('sensor.teltet_temperature') | float(0) %}
+          {% if t1 > 5 and t1 < 35 and t2 > 5 and t2 < 35 %}
+            {{ ((t1 + t2) / 2) | round(1) }}
+          {% elif t1 > 5 and t1 < 35 %}
+            {{ t1 | round(1) }}
+          {% elif t2 > 5 and t2 < 35 %}
+            {{ t2 | round(1) }}
+          {% else %}
+            unavailable
+          {% endif %}
+        availability: >
+          {% set t1 = states('sensor.kammeret_temperature') | float(0) %}
+          {% set t2 = states('sensor.teltet_temperature') | float(0) %}
+          {{ (t1 > 5 and t1 < 35) or (t2 > 5 and t2 < 35) }}
+
+      # Average Humidity (from 2 sensors)
+      - name: "Chamber Avg Humidity"
+        unique_id: chamber_avg_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        state: >
+          {% set h1 = states('sensor.kammeret_humidity') | float(0) %}
+          {% set h2 = states('sensor.teltet_luftfuktighet') | float(0) %}
+          {% if h1 > 30 and h1 < 100 and h2 > 30 and h2 < 100 %}
+            {{ ((h1 + h2) / 2) | round(1) }}
+          {% elif h1 > 30 and h1 < 100 %}
+            {{ h1 | round(1) }}
+          {% elif h2 > 30 and h2 < 100 %}
+            {{ h2 | round(1) }}
+          {% else %}
+            unavailable
+          {% endif %}
+        availability: >
+          {% set h1 = states('sensor.kammeret_humidity') | float(0) %}
+          {% set h2 = states('sensor.teltet_luftfuktighet') | float(0) %}
+          {{ (h1 > 30 and h1 < 100) or (h2 > 30 and h2 < 100) }}
+
+      # Target RH (OLD - deprecated, use sensor.dynamic_rh_setpoint instead)
+      # Kept for backward compatibility only
+      - name: "Chamber Target RH"
+        unique_id: chamber_target_rh
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: >
+          {{ states('sensor.dynamic_rh_setpoint') | float(93) }}
+        availability: >
+          {{ states('sensor.dynamic_rh_setpoint') not in ['unavailable', 'unknown', 'none'] }}
+
+      # Current VPD (monitoring)
+      - name: "Chamber Current VPD"
+        unique_id: chamber_current_vpd
+        unit_of_measurement: "kPa"
+        state_class: measurement
+        state: >
+          {% set T = states('sensor.chamber_avg_temp') | float(18) %}
+          {% set RH = states('sensor.chamber_avg_humidity') | float(85) %}
+          {% set SVP = 0.61078 * (2.71828 ** ((17.27 * T) / (T + 237.3))) %}
+          {% set VPD = SVP * (1 - (RH / 100)) %}
+          {{ VPD | round(2) }}
+        availability: >
+          {{ states('sensor.chamber_avg_temp') not in ['unavailable', 'unknown', 'none'] and
+             states('sensor.chamber_avg_humidity') not in ['unavailable', 'unknown', 'none'] }}
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # STATISTICS SENSORS (NYE)
+      # ─────────────────────────────────────────────────────────────────────────
+      
+      # VPD STABILITY INDEX (24h) - VPD v3 Compatible
+      - name: "VPD Stability Score"
+        unique_id: vpd_stability_score
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target = states('input_number.target_vpd_pinning') | float(0.08) if pinning
+                          else states('input_number.target_vpd_fruiting') | float(0.18) %}
+          {% set vpd = states('sensor.chamber_current_vpd_2') | float(0) %}
+          {% set deviation = (vpd - target) | abs %}
+          {% if deviation < 0.03 %}
+            100
+          {% elif deviation < 0.08 %}
+            {{ (100 - (deviation - 0.03) * 1000) | round(0) }}
+          {% elif deviation < 0.15 %}
+            {{ (50 - (deviation - 0.08) * 714) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+        icon: mdi:chart-line-variant
+        availability: >
+          {{ states('sensor.chamber_current_vpd_2') not in ['unavailable', 'unknown', 'none'] }}
+
+      # HUMIDITY CONTROL EFFICIENCY - VPD v3 Compatible
+      - name: "Humidity Control Efficiency"
+        unique_id: humidity_control_efficiency
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set current_rh = states('sensor.chamber_avg_humidity') | float(0) %}
+          {% set target_rh = states('sensor.dynamic_rh_setpoint') | float(93) %}
+          {% set deviation = (current_rh - target_rh) | abs %}
+          {% if deviation < 2 %}
+            100
+          {% elif deviation < 5 %}
+            {{ (100 - (deviation - 2) * 20) | round(0) }}
+          {% elif deviation < 10 %}
+            {{ (40 - (deviation - 5) * 8) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+        icon: mdi:water-check
+        availability: >
+          {{ states('sensor.chamber_avg_humidity') not in ['unavailable', 'unknown', 'none'] and
+             states('sensor.dynamic_rh_setpoint') not in ['unavailable', 'unknown', 'none'] }}
+
+      # HUMIDIFIER RUNTIME PERCENTAGE (24h estimate) - VPD v3 Compatible
+      - name: "Humidifier Runtime Percent"
+        unique_id: humidifier_runtime_percent
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set current_rh = states('sensor.chamber_avg_humidity') | float(0) %}
+          {% set target_rh = states('sensor.dynamic_rh_setpoint') | float(93) %}
+          {% if current_rh < target_rh - 3 %}
+            100
+          {% elif current_rh < target_rh + 3 %}
+            50
+          {% else %}
+            0
+          {% endif %}
+        icon: mdi:water-percent-alert
+
+      # TEMPERATURE DRIFT RATE (°C per hour estimate) - VPD v3 Compatible
+      # Note: This is a simplified version. For accurate drift tracking,
+      # consider using the statistics integration with mean sensor
+      - name: "Temperature Drift Rate"
+        unique_id: temperature_drift_rate
+        unit_of_measurement: "°C/h"
+        state_class: measurement
+        state: >
+          {% set current = states('sensor.chamber_avg_temp') | float(0) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target = 14 if is_pinning else 18 %}
+          {% set diff = (current - target) | abs %}
+          {% if diff < 0.5 %}
+            0.0
+          {% elif current > target %}
+            {{ (diff * 0.1) | round(2) }}
+          {% else %}
+            {{ (-diff * 0.1) | round(2) }}
+          {% endif %}
+        icon: >
+          {% set current = states('sensor.chamber_avg_temp') | float(0) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target = 14 if is_pinning else 18 %}
+          {% if current > target %}
+            mdi:thermometer-chevron-up
+          {% elif current < target %}
+            mdi:thermometer-chevron-down
+          {% else %}
+            mdi:thermometer
+          {% endif %}
+        availability: >
+          {{ states('sensor.chamber_avg_temp') not in ['unavailable', 'unknown', 'none'] }}
+
+      # ACH ACTUAL (calculated from fan state) - VPD v3 Compatible
+      - name: "ACH Actual Current"
+        unique_id: ach_actual_current
+        unit_of_measurement: "ACH"
+        state_class: measurement
+        state: >
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_ach = 4.0 if is_pinning else 7.0 %}
+          {% set fan_on = is_state('switch.vifter', 'on') %}
+          {% if fan_on %}
+            {{ target_ach }}
+          {% else %}
+            0.0
+          {% endif %}
+        icon: mdi:fan-speed-3
+        availability: >
+          {{ states('switch.vifter') not in ['unavailable', 'unknown', 'none'] }}
+
+      # CLIMATE HEALTH SCORE (Combined) - VPD v3 Compatible
+      - name: "Climate Health Score"
+        unique_id: climate_health_score
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set vpd_score = states('sensor.vpd_stability_score') | float(0) %}
+          {% set rh_score = states('sensor.humidity_control_efficiency') | float(0) %}
+          {% set temp = states('sensor.chamber_avg_temp') | float(16) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_temp = 14 if is_pinning else 16 %}
+          {% set temp_diff = (temp - target_temp) | abs %}
+          {% set temp_score = 100 if temp_diff < 1 else (100 - temp_diff * 20) %}
+          {% set temp_score = [0, [temp_score, 100] | min] | max %}
+          {{ ((vpd_score * 0.4 + rh_score * 0.4 + temp_score * 0.2) | round(0)) }}
+        icon: mdi:heart-pulse
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # VPD CONTROL SYSTEM SENSORS (v2.0 - Dynamisk)
+      # ─────────────────────────────────────────────────────────────────────────
+
+      # Dynamisk RH setpoint basert på temp og pinning phase
+      - name: "Dynamic RH Setpoint"
+        unique_id: dynamic_rh_setpoint
+        unit_of_measurement: "%"
+        icon: mdi:water-percent-alert
+        state: >
+          {% set temp = states('sensor.chamber_avg_temp') | float(18) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.15) if is_pinning
+                              else states('input_number.target_vpd_fruiting') | float(0.20) %}
+
+          {# Beregn Saturation Vapor Pressure (SVP) ved current temp #}
+          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
+
+          {# Beregn nødvendig Vapor Pressure for target VPD #}
+          {% set target_vp = svp - target_vpd %}
+
+          {# Beregn RH som gir target VPD #}
+          {% set rh = (target_vp / svp) * 100 %}
+
+          {{ rh | round(1) }}
+        attributes:
+          temperature: "{{ states('sensor.chamber_avg_temp') | float(18) }}"
+          target_vpd: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {{ states('input_number.target_vpd_pinning') | float(0.15) if is_pinning
+               else states('input_number.target_vpd_fruiting') | float(0.20) }}
+          phase: "{{ 'Pinning' if is_state('input_boolean.pinning_phase', 'on') else 'Fruiting' }}"
+
+      # RH lower/upper limits basert på VPD hysteresis
+      - name: "RH Control Lower Limit"
+        unique_id: rh_control_lower_limit
+        unit_of_measurement: "%"
+        state: >
+          {% set temp = states('sensor.chamber_avg_temp') | float(18) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.15) if is_pinning
+                              else states('input_number.target_vpd_fruiting') | float(0.20) %}
+          {% set vpd_hyst = states('input_number.vpd_hysteresis') | float(0.03) %}
+
+          {# Lower VPD = higher RH #}
+          {% set lower_vpd = target_vpd - vpd_hyst %}
+          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
+          {% set target_vp = svp - lower_vpd %}
+          {% set rh = (target_vp / svp) * 100 %}
+
+          {{ rh | round(1) }}
+
+      - name: "RH Control Upper Limit"
+        unique_id: rh_control_upper_limit
+        unit_of_measurement: "%"
+        state: >
+          {% set temp = states('sensor.chamber_avg_temp') | float(18) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.15) if is_pinning
+                              else states('input_number.target_vpd_fruiting') | float(0.20) %}
+          {% set vpd_hyst = states('input_number.vpd_hysteresis') | float(0.03) %}
+
+          {# Higher VPD = lower RH #}
+          {% set upper_vpd = target_vpd + vpd_hyst %}
+          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
+          {% set target_vp = svp - upper_vpd %}
+          {% set rh = (target_vp / svp) * 100 %}
+
+          {{ rh | round(1) }}
+
+      # Status sensors
+      - name: "Ventilation Status"
+        unique_id: ventilation_status
+        icon: >
+          {% if is_state('input_boolean.ventilation_pulse_mode', 'on') %}
+            mdi:fan-auto
+          {% else %}
+            mdi:fan-off
+          {% endif %}
+        state: >
+          {% if is_state('input_boolean.ventilation_pulse_mode', 'on') %}
+            {% if is_state('switch.vifte_canfan_switch', 'on') %}
+              Pulsing (ON)
+            {% elif is_state('timer.ventilation_cycle', 'active') %}
+              Pulsing (OFF - {{ state_attr('timer.ventilation_cycle', 'remaining') }})
+            {% else %}
+              Pulse Mode Active
+            {% endif %}
+          {% else %}
+            Manual Control
+          {% endif %}
+        attributes:
+          on_duration: >
+            {% if is_state('input_boolean.pinning_phase', 'on') %}
+              {{ states('input_number.ventilation_on_duration_pinning') }} s
+            {% else %}
+              {{ states('input_number.ventilation_on_duration_fruiting') }} s
+            {% endif %}
+          off_duration: >
+            {% if is_state('input_boolean.pinning_phase', 'on') %}
+              {{ states('input_number.ventilation_off_duration_pinning') }} s
+            {% else %}
+              {{ states('input_number.ventilation_off_duration_fruiting') }} s
+            {% endif %}
+          cycle_time: >
+            {% if is_state('input_boolean.pinning_phase', 'on') %}
+              {{ (states('input_number.ventilation_on_duration_pinning') | int + states('input_number.ventilation_off_duration_pinning') | int) }} s
+            {% else %}
+              {{ (states('input_number.ventilation_on_duration_fruiting') | int + states('input_number.ventilation_off_duration_fruiting') | int) }} s
+            {% endif %}
+          duty_cycle: >
+            {% if is_state('input_boolean.pinning_phase', 'on') %}
+              {{ ((states('input_number.ventilation_on_duration_pinning') | float /
+                  (states('input_number.ventilation_on_duration_pinning') | float +
+                   states('input_number.ventilation_off_duration_pinning') | float)) * 100) | round(1) }} %
+            {% else %}
+              {{ ((states('input_number.ventilation_on_duration_fruiting') | float /
+                  (states('input_number.ventilation_on_duration_fruiting') | float +
+                   states('input_number.ventilation_off_duration_fruiting') | float)) * 100) | round(1) }} %
+            {% endif %}
+
+      # ACH Calculation (Actual air changes per hour)
+      - name: "ACH Actual Calculated"
+        unique_id: ach_actual_calculated
+        unit_of_measurement: "ACH"
+        state_class: measurement
+        icon: mdi:fan-speed-3
+        state: >
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set on_time = states('input_number.ventilation_on_duration_pinning') | float if is_pinning
+                           else states('input_number.ventilation_on_duration_fruiting') | float %}
+          {% set off_time = states('input_number.ventilation_off_duration_pinning') | float if is_pinning
+                            else states('input_number.ventilation_off_duration_fruiting') | float %}
+          {% set cycle_time = on_time + off_time %}
+          {% set ach_per_cycle = on_time / 109 %}
+          {% set cycles_per_hour = 3600 / cycle_time %}
+          {{ (ach_per_cycle * cycles_per_hour) | round(1) }}
+        attributes:
+          on_duration: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {{ states('input_number.ventilation_on_duration_pinning') if is_pinning
+               else states('input_number.ventilation_on_duration_fruiting') }} s
+          off_duration: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {{ states('input_number.ventilation_off_duration_pinning') if is_pinning
+               else states('input_number.ventilation_off_duration_fruiting') }} s
+          cycle_time: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {% set on = states('input_number.ventilation_on_duration_pinning') | float if is_pinning
+                        else states('input_number.ventilation_on_duration_fruiting') | float %}
+            {% set off = states('input_number.ventilation_off_duration_pinning') | float if is_pinning
+                         else states('input_number.ventilation_off_duration_fruiting') | float %}
+            {{ (on + off) | round(0) }} s
+          phase: "{{ 'Pinning (14°C)' if is_state('input_boolean.pinning_phase', 'on') else 'Fruiting (18°C)' }}"
+
+      - name: "VPD Control Status"
+        unique_id: vpd_control_status
+        icon: mdi:chart-bell-curve
+        state: >
+          {% set current_vpd = states('sensor.chamber_current_vpd_2') | float(0) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+                              else states('input_number.target_vpd_fruiting') | float(0.18) %}
+          {% set vpd_hyst = states('input_number.vpd_hysteresis') | float(0.02) %}
+          {% set lower = target_vpd - vpd_hyst %}
+          {% set upper = target_vpd + vpd_hyst %}
+
+          {% if is_state('switch.vifter', 'on') %}
+            Override (Ventilation Active)
+          {% elif current_vpd > upper %}
+            VPD Too High ({{ current_vpd | round(2) }} > {{ upper | round(2) }})
+          {% elif current_vpd < lower %}
+            VPD Too Low ({{ current_vpd | round(2) }} < {{ lower | round(2) }})
+          {% else %}
+            VPD In Range ({{ current_vpd | round(2) }} kPa)
+          {% endif %}
+        attributes:
+          current_vpd: "{{ states('sensor.chamber_current_vpd_2') | float(0) | round(2) }}"
+          target_vpd: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {{ states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+               else states('input_number.target_vpd_fruiting') | float(0.18) }}
+          lower_limit: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {% set target = states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+                            else states('input_number.target_vpd_fruiting') | float(0.18) %}
+            {{ (target - states('input_number.vpd_hysteresis') | float(0.02)) | round(2) }}
+          upper_limit: >
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {% set target = states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+                            else states('input_number.target_vpd_fruiting') | float(0.18) %}
+            {{ (target + states('input_number.vpd_hysteresis') | float(0.02)) | round(2) }}
+          phase: "{{ 'Pinning' if is_state('input_boolean.pinning_phase', 'on') else 'Fruiting' }}"
+          dynamic_rh_setpoint: "{{ states('sensor.dynamic_rh_setpoint') }}"
+          current_rh: "{{ states('sensor.chamber_avg_humidity') }}"
+          fogger_state: "{{ states('switch.fogger') }}"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # DASHBOARD HELPER SENSORS
+      # ─────────────────────────────────────────────────────────────────────────
+
+      # Chamber Stability Index (combined score)
+      - name: "Chamber Stability Index"
+        unique_id: chamber_stability_index
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set vpd_stable = states('sensor.vpd_stability_score') | float(0) %}
+          {% set health = states('sensor.climate_health_score') | float(0) %}
+          {% set temp_drift = states('sensor.temperature_drift_rate') | float(0) | abs %}
+          {% set temp_stable = 100 if temp_drift < 0.2 else 50 %}
+          {{ ((vpd_stable * 0.5 + health * 0.3 + temp_stable * 0.2) | round(0)) }}
+        icon: mdi:chart-areaspline
+
+      # Smart Alert Status
+      - name: "VPD Alert Status"
+        unique_id: vpd_alert_status
+        state: >
+          {% set vpd = states('sensor.chamber_current_vpd_2') | float(0) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target = states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+                          else states('input_number.target_vpd_fruiting') | float(0.18) %}
+          {% set diff = (vpd - target) | abs %}
+          {% if diff < 0.03 %}
+            Perfekt
+          {% elif diff < 0.08 %}
+            God
+          {% elif diff < 0.15 %}
+            Akseptabel
+          {% else %}
+            Kritisk
+          {% endif %}
+        icon: >
+          {% set vpd = states('sensor.chamber_current_vpd_2') | float(0) %}
+          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+          {% set target = states('input_number.target_vpd_pinning') | float(0.08) if is_pinning
+                          else states('input_number.target_vpd_fruiting') | float(0.18) %}
+          {% set diff = (vpd - target) | abs %}
+          {% if diff < 0.03 %}
+            mdi:check-circle
+          {% elif diff < 0.08 %}
+            mdi:check
+          {% elif diff < 0.15 %}
+            mdi:alert-circle-outline
+          {% else %}
+            mdi:alert-circle
+          {% endif %}
+
+      # Temperature Alert Status
+      - name: "Temperature Alert Status"
+        unique_id: temperature_alert_status
+        state: >

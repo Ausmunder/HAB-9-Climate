@@ -1,0 +1,10 @@
+# VPD Control System - Timer
+ventilation_cycle:
+  name: Ventilation Cycle Timer
+  icon: mdi:timer-outline
+
+pinning_phase_countdown:
+  name: Pinning Phase Auto-Return
+  duration: "48:00:00"
+  icon: mdi:timer-sand
+  restore: true

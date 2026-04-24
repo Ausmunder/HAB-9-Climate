@@ -1,0 +1,545 @@
+views:
+  - title: VPD Climate Control
+    path: vpd-climate
+    icon: mdi:mushroom
+    type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: input_boolean.ventilation_pulse_mode
+                name: VPD SYSTEM
+                icon: mdi:one-up
+                icon_color: green
+                tap_action:
+                  action: toggle
+                card_mod:
+                  style: |
+                    ha-card {
+                      height: 100% !important;
+                      box-sizing: border-box;
+                      background: {% if is_state('input_boolean.ventilation_pulse_mode', 'on') %}
+                        linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)
+                      {% else %}
+                        linear-gradient(135deg, #C62828 0%, #8E0000 100%)
+                      {% endif %} !important;
+                      color: white;
+                    }
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:mushroom-template-card
+                    primary: Pinning
+                    icon: mdi:mushroom
+                    tap_action:
+                      action: call-service
+                      service: input_boolean.turn_on
+                      target:
+                        entity_id: input_boolean.pinning_phase
+                    color: |
+                      {% if is_state('input_boolean.pinning_phase', 'on') %}
+                        green
+                      {% else %}
+                        red
+                      {% endif %}
+                    vertical: true
+                  - type: custom:mushroom-template-card
+                    primary: Fruiting
+                    icon: mdi:mushroom
+                    tap_action:
+                      action: call-service
+                      service: input_boolean.turn_off
+                      target:
+                        entity_id: input_boolean.pinning_phase
+                    color: |
+                      {% if is_state('input_boolean.pinning_phase', 'off') %}
+                        green
+                      {% else %}
+                        red
+                      {% endif %}
+                    vertical: true
+                  - type: custom:mushroom-template-card
+                    primary: |
+                      {% if is_state('timer.pinning_phase_countdown', 'active') %}
+                        {% set remaining = state_attr('timer.pinning_phase_countdown', 'remaining') %}
+                        {% if remaining %}
+                          {{ remaining }}
+                        {% else %}
+                          Nedtelling
+                        {% endif %}
+                      {% else %}
+                        Pinning Phase
+                      {% endif %}
+                    secondary: |
+                      {% if is_state('timer.pinning_phase_countdown', 'active') %}
+                        Auto-retur til fruiting
+                      {% else %}
+                        Ingen aktiv timer
+                      {% endif %}
+                    icon: |
+                      {% if is_state('timer.pinning_phase_countdown', 'active') %}
+                        mdi:timer-sand
+                      {% else %}
+                        mdi:timer-off
+                      {% endif %}
+                    color: |
+                      {% if is_state('timer.pinning_phase_countdown', 'active') %}
+                        {% set remaining = state_attr('timer.pinning_phase_countdown', 'remaining') | default('48:00:00', true) %}
+                        {% set hours = remaining.split(':')[0] | int(0) %}
+                        {% if hours > 24 %}
+                          green
+                        {% elif hours > 12 %}
+                          amber
+                        {% else %}
+                          red
+                        {% endif %}
+                      {% else %}
+                        grey
+                      {% endif %}
+                    tap_action:
+                      action: more-info
+                      entity: timer.pinning_phase_countdown
+                    vertical: true
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: sensor.climate_health_score
+                name: Climate Health
+                icon: mdi:heart-pulse
+                card_mod:
+                  style: |
+                    ha-card {
+                      {% set score = states('sensor.climate_health_score') | float(0) %}
+                      {% if score >= 90 %}
+                        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%) !important;
+                      {% elif score >= 70 %}
+                        background: linear-gradient(135deg, #FFC107 0%, #F57C00 100%) !important;
+                      {% else %}
+                        background: linear-gradient(135deg, #F44336 0%, #C62828 100%) !important;
+                      {% endif %}
+                      color: white !important;
+                    }
+              - type: custom:mushroom-entity-card
+                entity: sensor.vpd_stability_score
+                name: VPD Stability
+                icon: mdi:chart-line-variant
+                card_mod:
+                  style: |
+                    ha-card {
+                      {% set score = states('sensor.vpd_stability_score') | float(0) %}
+                      {% if score >= 90 %}
+                        background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%) !important;
+                      {% elif score >= 70 %}
+                        background: linear-gradient(135deg, #FFC107 0%, #F57C00 100%) !important;
+                      {% else %}
+                        background: linear-gradient(135deg, #F44336 0%, #C62828 100%) !important;
+                      {% endif %}
+                      color: white !important;
+                    }
+          - type: markdown
+            content: >
+              ### ⚠️ System Status
+
+              **VPD:** {{ states('sensor.chamber_current_vpd') }} kPa
+              **Temp:** {{ states('sensor.chamber_avg_temp') }} °C   **RH:** {{
+              states('sensor.chamber_avg_humidity') }} %
+            card_mod:
+              style: |
+                ha-card {
+                  background: linear-gradient(135deg, #37474F 0%, #263238 100%);
+                  color: white;
+                }
+          - type: history-graph
+            entities:
+              - entity: switch.fogger_switch
+                name:
+                  type: device
+              - entity: switch.vifter_switch
+            title: Fogger/vifter historikk
+            hours_to_show: 0.5
+            grid_options:
+              rows: 3
+              columns: 12
+          - type: custom:mushroom-light-card
+            entity: light.fruktenkammer
+            tap_action:
+              action: toggle
+            show_brightness_control: false
+            show_color_control: false
+            use_light_color: false
+            fill_container: false
+            name: Lys kammeret
+            icon_color: light-blue
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: switch.fogger_switch
+                    name: Fogger
+                    icon: mdi:water-plus
+                    icon_color: blue
+                    tap_action:
+                      action: toggle
+                    card_mod:
+                      style:
+                        mushroom-shape-icon$: |
+                          .shape {
+                            {% if is_state('switch.fogger_switch', 'on') %}
+                            --shape-animation: spray 1s ease-in-out infinite;
+                            {% endif %}
+                          }
+                          @keyframes spray {
+                            0%, 100% { transform: scale(1); opacity: 1; }
+                            50% { transform: scale(1.15); opacity: 0.7; }
+                          }
+                  - type: custom:mushroom-entity-card
+                    entity: switch.vifter_switch
+                    name: Vifter
+                    icon: mdi:fan
+                    icon_color: green
+                    tap_action:
+                      action: toggle
+                    card_mod:
+                      style:
+                        mushroom-shape-icon$: |
+                          .shape {
+                            {% if is_state('switch.vifter_switch', 'on') %}
+                            --shape-animation: spin 1.5s linear infinite;
+                            {% endif %}
+                          }
+                          @keyframes spin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                          }
+              - type: custom:apexcharts-card
+                header:
+                  show: false
+                graph_span: 3h
+                now:
+                  show: true
+                  color: red
+                all_series_config:
+                  type: line
+                  curve: stepline
+                  stroke_width: 4
+                series:
+                  - entity: switch.fogger_switch
+                    color: '#03a9f4'
+                    transform: 'return x === ''on'' ? 1 : 0;'
+                  - entity: switch.vifter_switch
+                    color: '#4caf50'
+                    transform: 'return x === ''on'' ? 0.5 : 0;'
+                yaxis:
+                  - show: false
+                apex_config:
+                  legend:
+                    show: false
+                  grid:
+                    show: false
+      - type: grid
+        cards:
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: Temperature (12h)
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 2
+              curve: smooth
+              type: line
+              group_by:
+                func: avg
+                duration: 5min
+            yaxis:
+              - min: 14
+                max: 20
+                decimals: 1
+            series:
+              - entity: sensor.chamber_avg_temp
+                name: Temperature
+                color: '#FFFFFF'
+                stroke_width: 2
+              - entity: sensor.chamber_avg_temp
+                name: Pinning (15°C)
+                color: '#4CAF50'
+                stroke_width: 1
+                opacity: 0.5
+                transform: 'return 15;'
+                show:
+                  in_chart: true
+              - entity: sensor.chamber_avg_temp
+                name: Fruiting (17°C)
+                color: '#FF9800'
+                stroke_width: 1
+                opacity: 0.5
+                transform: 'return 17;'
+                show:
+                  in_chart: true
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: Humidity & VPD Targets (12h)
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 2
+              curve: smooth
+              type: line
+              group_by:
+                func: avg
+                duration: 5min
+            yaxis:
+              - id: humidity
+                min: 85
+                max: 98
+                decimals: 1
+                apex_config:
+                  title:
+                    text: Humidity (%)
+              - id: vpd
+                opposite: true
+                min: 0
+                max: 0.2
+                decimals: 2
+                apex_config:
+                  title:
+                    text: VPD (kPa)
+            series:
+              - entity: sensor.chamber_avg_humidity
+                name: Humidity
+                color: '#4ECDC4'
+                stroke_width: 2
+                yaxis_id: humidity
+              - entity: sensor.dynamic_rh_setpoint
+                name: RH Target
+                color: '#424DC1'
+                stroke_width: 2
+                yaxis_id: humidity
+              - entity: input_number.target_vpd_pinning
+                name: VPD Target Pinning
+                color: '#4CAF50'
+                stroke_width: 1
+                opacity: 0.5
+                yaxis_id: vpd
+              - entity: input_number.target_vpd_fruiting
+                name: VPD Target Fruiting
+                color: '#FF9800'
+                stroke_width: 1
+                opacity: 0.5
+                yaxis_id: vpd
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: VPD (12h)
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 7
+              curve: smooth
+              type: line
+              group_by:
+                func: avg
+                duration: 5min
+            apex_config:
+              chart:
+                height: 200px
+              theme:
+                mode: dark
+              grid:
+                borderColor: rgba(255, 255, 255, 0.1)
+              xaxis:
+                labels:
+                  style:
+                    fontSize: 11px
+              legend:
+                show: true
+                position: top
+                fontSize: 11px
+            yaxis:
+              - decimals: 2
+                min: 0.1
+                max: 0.4
+            series:
+              - entity: sensor.chamber_current_vpd
+                name: Current VPD
+                color: '#38EF7D'
+                stroke_width: 2
+              - entity: input_number.target_vpd_pinning
+                name: Target (Pinning)
+                color: '#4CAF50'
+                opacity: 0.5
+                type: line
+                stroke_width: 1
+              - entity: input_number.target_vpd_fruiting
+                name: Target (Fruiting)
+                color: '#8B4513'
+                opacity: 0.5
+                type: line
+                stroke_width: 1
+          - type: markdown
+            content: >
+              ### 📊 Phase Settings Comparison
+
+              | Parameter | Pinning | Fruiting |
+
+              |-----------|---------|----------|
+
+              | **VPD Target** | {{ states('input_number.target_vpd_pinning') }} kPa | {{ states('input_number.target_vpd_fruiting') }} kPa |
+
+              | **RH Target** | {{ states('sensor.rh_target_pinning_phase') }}% | {{ states('sensor.rh_target_fruiting_phase') }}% |
+
+              | **Temperature** | 15°C | 17°C |
+
+              | **ACH Target** | {{ states('input_number.ach_target_pinning') }} h⁻¹ | {{ states('input_number.ach_target_fruiting') }} h⁻¹ |
+
+              | **ACH Faktisk** | {{ states('sensor.ach_actual_calculated') }} | — |
+      - type: grid
+        cards:
+          - type: entities
+            title: 📊 Current Readings
+            show_header_toggle: false
+            entities:
+              - sensor.chamber_current_vpd
+              - sensor.chamber_avg_temp
+              - sensor.chamber_avg_humidity
+              - sensor.dynamic_rh_setpoint
+            grid_options:
+              columns: 12
+              rows: auto
+          - square: false
+            type: grid
+            columns: 1
+            cards:
+              - type: custom:mushroom-title-card
+                title: VPD Parameters
+                subtitle: Target Settings
+              - type: custom:mushroom-number-card
+                entity: input_number.target_vpd_pinning
+                name: Target VPD (Pinning)
+                icon: mdi:water-percent
+                display_mode: buttons
+              - type: custom:mushroom-number-card
+                entity: input_number.target_vpd_fruiting
+                name: Target VPD (Fruiting)
+                icon: mdi:water-percent
+                display_mode: buttons
+              - type: custom:mushroom-number-card
+                entity: input_number.vpd_hysteresis
+                name: VPD Hysteresis
+                icon: mdi:delta
+                display_mode: buttons
+              - type: custom:mushroom-title-card
+                title: RH% Targets
+                subtitle: Beregnet fra VPD-target
+              - type: horizontal-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: sensor.rh_target_pinning_phase
+                    name: RH Pinning
+                    icon: mdi:water-percent
+                    icon_color: green
+                  - type: custom:mushroom-entity-card
+                    entity: sensor.rh_target_fruiting_phase
+                    name: RH Fruiting
+                    icon: mdi:water-percent
+                    icon_color: orange
+              - type: custom:mushroom-title-card
+                title: Ventilasjon ACH
+                subtitle: Luftutskiftninger per time
+              - type: custom:mushroom-number-card
+                entity: input_number.ach_target_pinning
+                name: ACH (Pinning)
+                icon: mdi:fan-speed-1
+                display_mode: buttons
+              - type: custom:mushroom-number-card
+                entity: input_number.ach_target_fruiting
+                name: ACH (Fruiting)
+                icon: mdi:fan-speed-3
+                display_mode: buttons
+              - type: custom:mushroom-entity-card
+                entity: sensor.ach_actual_calculated
+                name: ACH (faktisk beregnet)
+                icon: mdi:fan-clock
+                icon_color: blue
+
+            grid_options:
+              columns: 12
+              rows: auto
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### Incubation Room
+
+              **Temp:** {{ states('sensor.incubation_avg_temp') }} °C
+              **RH:** {{ states('sensor.incubation_avg_humidity') }} %
+            card_mod:
+              style: |
+                ha-card {
+                  background: linear-gradient(135deg, #5D4037 0%, #3E2723 100%);
+                  color: white;
+                }
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: Incubation Temp & Humidity (12h)
+              show_states: true
+              colorize_states: true
+            all_series_config:
+              stroke_width: 2
+              curve: smooth
+              type: line
+              group_by:
+                func: avg
+                duration: 5min
+            yaxis:
+              - id: temp
+                min: 20
+                max: 30
+                decimals: 1
+                apex_config:
+                  title:
+                    text: Temp (°C)
+              - id: humidity
+                opposite: true
+                min: 50
+                max: 100
+                decimals: 1
+                apex_config:
+                  title:
+                    text: RH (%)
+            series:
+              - entity: sensor.incubation_avg_temp
+                name: Temperature
+                color: '#FF9800'
+                stroke_width: 2
+                yaxis_id: temp
+              - entity: sensor.incubation_avg_humidity
+                name: Humidity
+                color: '#4ECDC4'
+                stroke_width: 2
+                yaxis_id: humidity
+          - type: entities
+            title: Incubation Sensors
+            show_header_toggle: false
+            entities:
+              - sensor.incubation_avg_temp
+              - sensor.incubation_avg_humidity
+              - sensor.incubation_sensor_1_temperature
+              - sensor.incubation_sensor_1_humidity
+              - sensor.incubation_sensor_2_temperature
+              - sensor.incubation_sensor_2_humidity
+    badges: []

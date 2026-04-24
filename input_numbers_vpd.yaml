@@ -1,0 +1,69 @@
+# VPD Control System - Input Numbers
+# Ventilasjons-pulsstyring
+# ACH-definisjon: 1 ACH = 120s på-tid = én komplett luftutskifting (empirisk målt)
+# ACH-target styrer frekvens (n ganger/time). Off-tid = (3600/ACH) - on_duration (beregnes av timer)
+ventilation_on_duration_pinning:
+  name: Ventilation ON Duration (Pinning)
+  min: 60
+  max: 150
+  step: 5
+  unit_of_measurement: "s"
+  icon: mdi:fan-clock
+  initial: 120
+
+ventilation_on_duration_fruiting:
+  name: Ventilation ON Duration (Fruiting)
+  min: 60
+  max: 150
+  step: 5
+  unit_of_measurement: "s"
+  icon: mdi:fan-clock
+  initial: 120
+
+# VPD-styring (DYNAMISK) - Optimalisert for 15°C/17°C
+target_vpd_pinning:
+  name: Target VPD Pinning Phase
+  min: 0.05
+  max: 0.30
+  step: 0.01
+  unit_of_measurement: "kPa"
+  icon: mdi:sprout
+  initial: 0.10
+
+target_vpd_fruiting:
+  name: Target VPD Fruiting Phase
+  min: 0.05
+  max: 0.35
+  step: 0.01
+  unit_of_measurement: "kPa"
+  icon: mdi:mushroom
+  initial: 0.12
+
+# ACH-styring (luftutskiftninger per time)
+ach_target_pinning:
+  name: ACH Target (Pinning)
+  min: 2
+  max: 15
+  step: 1
+  unit_of_measurement: "h⁻¹"
+  icon: mdi:fan-speed-1
+  initial: 6.0
+
+ach_target_fruiting:
+  name: ACH Target (Fruiting)
+  min: 2
+  max: 15
+  step: 1
+  unit_of_measurement: "h⁻¹"
+  icon: mdi:fan-speed-3
+  initial: 7.0
+
+# Hysterese
+vpd_hysteresis:
+  name: VPD Hysteresis
+  min: 0.01
+  max: 0.10
+  step: 0.01
+  unit_of_measurement: "kPa"
+  icon: mdi:delta
+  initial: 0.02

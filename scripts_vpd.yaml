@@ -1,0 +1,52 @@
+# VPD System Scripts
+
+vpd_enable_all_automations:
+  alias: 'VPD: Enable All Critical Automations'
+  description: Aktiverer manuelt alle VPD-automasjoner (bruk dette hvis de blir disabled)
+  sequence:
+  - service: homeassistant.turn_on
+    target:
+      entity_id:
+        - automation.vpd_control_fogger_burst
+        - automation.vpd_control_emergency_stop_fogger
+        - automation.ventilation_time_pattern_udodelig
+  - service: persistent_notification.create
+    data:
+      title: '✅ VPD Automations Enabled'
+      message: |
+        Alle VPD-automasjoner er nå aktivert:
+        - Fogger Burst (v3)
+        - Emergency Stop
+        - Ventilation (Udødelig)
+      notification_id: vpd_manual_enable
+  mode: single
+
+vpd_force_restart:
+  alias: 'VPD: Force System Restart'
+  description: Slår VPD-systemet AV og PÅ igjen, og aktiverer alle automasjoner
+  sequence:
+  - service: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.ventilation_pulse_mode
+  - delay:
+      seconds: 3
+  - service: homeassistant.turn_on
+    target:
+      entity_id:
+        - automation.vpd_control_fogger_burst
+        - automation.vpd_control_emergency_stop_fogger
+        - automation.ventilation_time_pattern_udodelig
+  - delay:
+      seconds: 2
+  - service: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.ventilation_pulse_mode
+  - service: persistent_notification.create
+    data:
+      title: '🔄 VPD System Restarted'
+      message: |
+        VPD-systemet har blitt restartet.
+        Alle automasjoner aktivert.
+        System status: {{ states('input_boolean.ventilation_pulse_mode') }}
+      notification_id: vpd_force_restart
+  mode: single

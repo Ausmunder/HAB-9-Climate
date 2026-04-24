@@ -1,0 +1,588 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "vpd-monitoring",
+    "title": "VPD Climate Monitoring",
+    "tags": ["vpd", "mushroom", "climate"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "time": {
+      "from": "now-12h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "timeseries",
+        "title": "Temperature & Humidity (12h)",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_avg_temp",
+            "alias": "Temperature"
+          },
+          {
+            "refId": "B",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_avg_humidity",
+            "alias": "Humidity"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "unit": "celsius"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Temperature"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#2196F3",
+                    "mode": "fixed"
+                  }
+                },
+                {
+                  "id": "custom.axisPlacement",
+                  "value": "left"
+                },
+                {
+                  "id": "min",
+                  "value": 10
+                },
+                {
+                  "id": "max",
+                  "value": 25
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Humidity"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#00BCD4",
+                    "mode": "fixed"
+                  }
+                },
+                {
+                  "id": "custom.axisPlacement",
+                  "value": "right"
+                },
+                {
+                  "id": "unit",
+                  "value": "percent"
+                },
+                {
+                  "id": "min",
+                  "value": 70
+                },
+                {
+                  "id": "max",
+                  "value": 100
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "calcs": ["lastNotNull", "mean"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "type": "timeseries",
+        "title": "VPD (12h)",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 24,
+          "h": 7
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_current_vpd_2",
+            "alias": "VPD"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisLabel": "kPa",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 20,
+              "gradientMode": "opacity",
+              "lineInterpolation": "smooth",
+              "lineWidth": 3,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true,
+              "thresholdsStyle": {
+                "mode": "line"
+              }
+            },
+            "unit": "pressurekpa",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "#2196F3",
+                  "value": 0.15
+                },
+                {
+                  "color": "#4CAF50",
+                  "value": 0.20
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "VPD"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "#4CAF50",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {
+            "calcs": ["lastNotNull", "mean", "min", "max"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "timeseries",
+        "title": "Climate Health Score (12h)",
+        "gridPos": {
+          "x": 0,
+          "y": 15,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.climate_health_score",
+            "alias": "Health Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisLabel": "%",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 30,
+              "gradientMode": "scheme",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 40
+                },
+                {
+                  "color": "green",
+                  "value": 70
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "calcs": ["lastNotNull", "mean"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "type": "timeseries",
+        "title": "VPD Stability Score (12h)",
+        "gridPos": {
+          "x": 12,
+          "y": 15,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.vpd_stability_score",
+            "alias": "Stability Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisLabel": "%",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 30,
+              "gradientMode": "scheme",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 40
+                },
+                {
+                  "color": "green",
+                  "value": 70
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {
+            "calcs": ["lastNotNull", "mean"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "type": "stat",
+        "title": "Current VPD",
+        "gridPos": {
+          "x": 0,
+          "y": 21,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_current_vpd_2"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "pressurekpa",
+            "decimals": 2,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.23
+                },
+                {
+                  "color": "orange",
+                  "value": 0.30
+                },
+                {
+                  "color": "red",
+                  "value": 0.35
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "textMode": "value_and_name",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 6,
+        "type": "stat",
+        "title": "Current Temperature",
+        "gridPos": {
+          "x": 6,
+          "y": 21,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_avg_temp"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "celsius",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 17
+                },
+                {
+                  "color": "yellow",
+                  "value": 19
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "textMode": "value_and_name",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 7,
+        "type": "stat",
+        "title": "Current Humidity",
+        "gridPos": {
+          "x": 12,
+          "y": 21,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.chamber_avg_humidity"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "percent",
+            "decimals": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 85
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                },
+                {
+                  "color": "orange",
+                  "value": 95
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "textMode": "value_and_name",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 8,
+        "type": "stat",
+        "title": "Climate Health",
+        "gridPos": {
+          "x": 18,
+          "y": 21,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": "Home Assistant",
+            "entity_id": "sensor.climate_health_score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "percent",
+            "decimals": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 40
+                },
+                {
+                  "color": "green",
+                  "value": 70
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "background",
+          "textMode": "value_and_name",
+          "orientation": "auto"
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}

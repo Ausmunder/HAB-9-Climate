@@ -1,0 +1,894 @@
+- id: '1706189744048'
+  alias: HASS Shutdown notification
+  description: ''
+  trigger:
+  - event: shutdown
+    platform: homeassistant
+  conditions: []
+  action:
+  - metadata: {}
+    data:
+      message: HASS down!
+    service: notify.mobile_app_pixel_9a
+  mode: single
+- id: '1706189870920'
+  alias: HASS Running notification
+  description: ''
+  trigger:
+  - event: start
+    platform: homeassistant
+  conditions: []
+  action:
+  - metadata: {}
+    data:
+      message: HASS up!
+    service: notify.mobile_app_pixel_9a
+  mode: single
+- id: vpd_system_auto_start
+  alias: 'VPD System: Auto-start ved HASS oppstart'
+  description: Aktiverer VPD pulse mode og alle kritiske automasjoner ved oppstart
+    (med retry-logikk)
+  trigger:
+  - platform: homeassistant
+    event: start
+  action:
+  - delay:
+      seconds: 45
+  - service: homeassistant.turn_on
+    target:
+      entity_id:
+      - automation.vpd_control_fogger_burst_v3
+      - automation.vpd_control_emergency_stop_v3
+      - automation.ventilation_time_pattern_v3
+    continue_on_error: true
+  - delay:
+      seconds: 3
+  - service: automation.turn_on
+    target:
+      entity_id:
+      - automation.vpd_control_fogger_burst_v3
+      - automation.vpd_control_emergency_stop_v3
+    continue_on_error: true
+  - service: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.ventilation_pulse_mode
+  - delay:
+      seconds: 2
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ✅ VPD System Started
+      message: 'VPD Control System v3 aktivert automatisk ved oppstart.
+
+        Fogger: 10s bursts hver 90s (11.1% duty cycle)
+
+        Ventilation: Hver 5. minutt
+
+        System er nå i automatisk modus.'
+      data:
+        priority: high
+        channel: VPD_System
+  mode: single
+- id: ventilation_safety_net_on_startup
+  alias: 'Ventilation: Safety Net on Startup'
+  description: Ensures ventilation fan is OFF on HA boot (prevents stuck-on if restart
+    during delay)
+  trigger:
+  - event: start
+    platform: homeassistant
+  action:
+  - delay:
+      seconds: 10
+  - target:
+      entity_id: switch.vifter_switch
+    service: switch.turn_off
+  mode: single
+- id: '1706464081307'
+  alias: Entities offline
+  description: Push når entity er unavailable
+  trigger:
+  - platform: state
+    entity_id:
+    - sensor.kammeret_temperature
+    - sensor.kammeret_humidity
+    - sensor.teltet_temperature
+    - sensor.teltet_luftfuktighet
+    - switch.vifter_switch
+    - switch.fogger_switch
+    to: unavailable
+    from:
+  condition: []
+  action:
+  - service: notify.mobile_app_pixel_9a
+    metadata: {}
+    data:
+      message: Entity offline
+  mode: single
+- id: '1707774861200'
+  alias: Varmepumpe nattvarme
+  description: Heat og fan 5 fra 0600 til 0700
+  trigger:
+  - at: 06:00:00
+    platform: time
+  condition:
+  - condition: numeric_state
+    entity_id: sensor.netatmo_ute_temperature
+    below: 6
+  action:
+  - metadata: {}
+    data:
+      fan_mode: '5'
+    target:
+      device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    action: climate.set_fan_mode
+  - target:
+      device_id:
+      - 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    data:
+      hvac_mode: heat
+    action: climate.set_hvac_mode
+  - delay:
+      hours: 1
+      minutes: 0
+      seconds: 0
+      milliseconds: 0
+  - metadata: {}
+    data:
+      fan_mode: auto
+    target:
+      device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    action: climate.set_fan_mode
+  - target:
+      device_id:
+      - 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    data:
+      hvac_mode: fan_only
+    enabled: false
+    action: climate.set_hvac_mode
+  mode: single
+- id: '1726261596303'
+  alias: Sofalys av ved Shield på
+  description: ''
+  trigger:
+  - device_id: 970ec9f159904a94a72d554904570211
+    domain: media_player
+    entity_id: 81f173bca31b10feee7561d004cee1d1
+    type: playing
+    platform: device
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+  conditions: []
+  action:
+  - type: turn_off
+    device_id: 2fd63bcc76d641701747a4b22e965745
+    entity_id: 9708f5dc00642cdfcd7fbb1a522e2487
+    domain: light
+  mode: single
+- id: '1726826102874'
+  alias: Auto varme under 16 grader
+  description: ''
+  trigger:
+  - type: temperature
+    device_id: cd64aaaeb40b5c949c2f55ab5388c604
+    entity_id: 39fc0024d5bc2f88a38186fb6b4bb196
+    domain: sensor
+    below: 16
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+    platform: device
+  conditions: []
+  action:
+  - metadata: {}
+    data: {}
+    target:
+      device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    action: climate.turn_on
+  - target:
+      device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    data:
+      hvac_mode: heat
+      temperature: 20
+    action: climate.set_temperature
+  - metadata: {}
+    data:
+      fan_mode: Auto
+    target:
+      device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    action: climate.set_fan_mode
+  mode: single
+- id: '1726842316112'
+  alias: Auto off climate 16 grader
+  description: ''
+  trigger:
+  - type: temperature
+    platform: device
+    device_id: cd64aaaeb40b5c949c2f55ab5388c604
+    entity_id: 39fc0024d5bc2f88a38186fb6b4bb196
+    domain: sensor
+    above: 16
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+  condition: []
+  action:
+  - target:
+      device_id:
+      - 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    data: {}
+    action: climate.turn_off
+  mode: single
+- id: '1732612893605'
+  alias: Sanna i fallet
+  description: Send notifikasjon raskt når Sanna kommer hjem til Lorenfallet.
+  trigger:
+  - entity_id: person.sanna
+    from: not_home
+    to: zone.lorenfallet
+    platform: state
+  condition:
+  - condition: zone
+    entity_id: person.aasmund
+    zone: zone.lorenfallet
+  action:
+  - data:
+      message: Sanna hjemme
+      title: Hjemkomst
+      data:
+        priority: high
+        ttl: 0
+    service: notify.mobile_app_pixel_9a
+  mode: single
+- id: '1733942854591'
+  alias: Panelovn hos Nils – ukedager og helg
+  description: ''
+  trigger:
+  - trigger: time
+    at: 08:00:00
+    id: weekday_on
+  - trigger: time
+    at: 08:00:00
+    id: weekend_on
+  - trigger: time
+    at: '19:00:00'
+    id: 'off'
+  conditions: []
+  action:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: weekday_on
+      - condition: time
+        weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+      sequence:
+      - device_id: 58ce76ef1fcdf966289b9019de433399
+        domain: climate
+        entity_id: 2deebe9c8ee5fb72a9cdebcd93864df1
+        type: set_hvac_mode
+        hvac_mode: heat
+    - conditions:
+      - condition: trigger
+        id: weekend_on
+      - condition: time
+        weekday:
+        - sat
+        - sun
+      sequence:
+      - device_id: 58ce76ef1fcdf966289b9019de433399
+        domain: climate
+        entity_id: 2deebe9c8ee5fb72a9cdebcd93864df1
+        type: set_hvac_mode
+        hvac_mode: heat
+    - conditions:
+      - condition: trigger
+        id: 'off'
+      sequence:
+      - device_id: 58ce76ef1fcdf966289b9019de433399
+        domain: climate
+        entity_id: 2deebe9c8ee5fb72a9cdebcd93864df1
+        type: set_hvac_mode
+        hvac_mode: 'off'
+  mode: single
+- id: '1756930475959'
+  alias: Varmepumpe kun vifte over 22 grader
+  description: ''
+  trigger:
+  - type: temperature
+    device_id: edc4bc0ae8613f7a4a0eb8e6b39a5684
+    entity_id: 1a1ac297c5e0035fc948b72bef8668c2
+    domain: sensor
+    platform: device
+    above: 22
+    for:
+      hours: 0
+      minutes: 2
+      seconds: 0
+  condition:
+  - condition: device
+    device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    domain: climate
+    entity_id: 23360e47581908809e5063665e22e912
+    type: is_hvac_mode
+    hvac_mode: heat
+  action:
+  - device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    domain: climate
+    entity_id: 23360e47581908809e5063665e22e912
+    type: set_hvac_mode
+    hvac_mode: fan_only
+  mode: single
+- id: '1757947818341'
+  alias: Varmepumpe slår på heat under 22 grader
+  description: ''
+  trigger:
+  - type: temperature
+    device_id: edc4bc0ae8613f7a4a0eb8e6b39a5684
+    entity_id: 1a1ac297c5e0035fc948b72bef8668c2
+    domain: sensor
+    platform: device
+    for:
+      hours: 0
+      minutes: 2
+      seconds: 0
+    below: 22
+  condition:
+  - condition: device
+    device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    domain: climate
+    entity_id: 23360e47581908809e5063665e22e912
+    type: is_hvac_mode
+    hvac_mode: fan_only
+  action:
+  - device_id: 7eedb8b9df0896ee5b6b64dd3fa6ebe6
+    domain: climate
+    entity_id: 23360e47581908809e5063665e22e912
+    type: set_hvac_mode
+    hvac_mode: heat
+  mode: single
+- id: '1763482457315'
+  alias: Varmepumpe kun oppvarming (Netatmo)
+  description: 'Styrer varmepumpe for oppvarming basert på Netatmo inne-sensor. Vifte-prioritert
+    strategi for bedre effektivitet. Aggressiv kulde-kompensasjon ved lave utetemperaturer.
+    Bruker input_datetime for pålitelig cooldown.
+
+    '
+  triggers:
+  - trigger: time_pattern
+    minutes: /15
+  conditions:
+  - condition: template
+    value_template: '{{ states(''sensor.netatmo_inne_temperature'') not in [''unknown'',
+      ''unavailable'', ''none''] }}'
+  - condition: template
+    value_template: '{{ (now() - states.sensor.netatmo_inne_temperature.last_updated).total_seconds()
+      < 1800 }}'
+  actions:
+  - if:
+    - condition: template
+      value_template: '{{ states(''climate.varmepumpe'') != ''heat'' }}'
+    then:
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.varmepumpe
+      data:
+        hvac_mode: heat
+  - variables:
+      actual: '{{ states(''sensor.netatmo_inne_temperature'') | float(20) }}'
+      target: '{{ states(''input_number.onsket_innetemp'') | float(22) }}'
+      outdoor: '{{ states(''sensor.netatmo_ute_temperature'') | float(5) }}'
+      current_temp: '{{ state_attr(''climate.varmepumpe'', ''temperature'') | float(22)
+        }}'
+      current_fan: '{{ state_attr(''climate.varmepumpe'', ''fan_mode'') | default(''2'')
+        }}'
+      diff: '{{ target - actual }}'
+      seconds_since_change: "{% set last = states('input_datetime.varmepumpe_sist_endret')
+        %} {% if last in ['unknown', 'unavailable', 'none'] %}\n  9999\n{% else %}\n
+        \ {{ (now() - (last | as_datetime | as_local)).total_seconds() }}\n{% endif
+        %}"
+  - variables:
+      needs_heat: '{{ diff > 0.3 }}'
+      too_warm: '{{ diff < -0.7 }}'
+      cold_boost_fan: "{% if outdoor | float < -15 %}\n  2\n{% elif outdoor | float
+        < -10 %}\n  1\n{% else %}\n  0\n{% endif %}"
+      cold_boost_temp: '{{ 2 if outdoor | float < -15 else 1 }}'
+      new_temp: "{% if needs_heat %}\n  {{ [[target + cold_boost_temp, 18] | max,
+        25] | min | int }}\n{% elif too_warm %}\n  {{ [target | int, 18] | max }}\n{%
+        else %}\n  {{ current_temp | int }}\n{% endif %}"
+      new_fan: '{% set base = 5 if diff > 1.5 else 4 if diff > 0.3 else 3 if diff
+        > 0.1 else 2 if diff > -0.7 else 1 %} {{ [base + cold_boost_fan | int, 5]
+        | min }}'
+      temp_change: '{{ new_temp | int != current_temp | int }}'
+      fan_change: '{{ new_fan | string != current_fan | string }}'
+      needs_change: '{{ temp_change or fan_change }}'
+      cooldown_ok: '{{ seconds_since_change | float > 900 }}'
+  - condition: template
+    value_template: '{{ needs_change and cooldown_ok }}'
+  - if:
+    - condition: template
+      value_template: '{{ temp_change }}'
+    then:
+    - action: climate.set_temperature
+      target:
+        entity_id: climate.varmepumpe
+      data:
+        temperature: '{{ new_temp }}'
+  - if:
+    - condition: template
+      value_template: '{{ fan_change }}'
+    then:
+    - action: climate.set_fan_mode
+      target:
+        entity_id: climate.varmepumpe
+      data:
+        fan_mode: '{{ new_fan }}'
+  - action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.varmepumpe_sist_endret
+    data:
+      datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+  mode: single
+- id: '1764247559363'
+  alias: Notifikasjon - Varmepumpeinnstilling endret
+  description: Sender varsel når varmepumpens setpunkt eller modus endres.
+  trigger:
+  - trigger: state
+    entity_id: climate.varmepumpe
+    attribute: temperature
+  - trigger: state
+    entity_id: climate.varmepumpe
+    attribute: fan_mode
+  - trigger: state
+    entity_id: climate.varmepumpe
+    attribute: hvac_mode
+  conditions: []
+  action:
+  - variables:
+      new_temp: '{{ state_attr(''climate.varmepumpe'', ''temperature'') }}'
+      new_fan: '{{ state_attr(''climate.varmepumpe'', ''fan_mode'') }}'
+      new_hvac: '{{ state_attr(''climate.varmepumpe'', ''hvac_mode'') }}'
+      old_temp: '{{ trigger.from_state.attributes.temperature }}'
+      old_fan: '{{ trigger.from_state.attributes.fan_mode }}'
+      old_hvac: '{{ trigger.from_state.attributes.hvac_mode }}'
+      message_body: "{% set changes = [] %} {% if new_hvac != old_hvac %}\n  {% set
+        changes = changes + [\"Modus: \" ~ old_hvac ~ \" -> \" ~ new_hvac] %}\n{%
+        endif %} {% if new_temp != old_temp %}\n  {% set changes = changes + [\"Setpunkt:
+        \" ~ old_temp ~ \"°C -> \" ~ new_temp ~ \"°C\"] %}\n{% endif %} {% if new_fan
+        != old_fan %}\n  {% set changes = changes + [\"Vifte: \" ~ old_fan ~ \" ->
+        \" ~ new_fan] %}\n{% endif %} Varmepumpen har endret innstilling. Endringer:
+        {{ changes | join(', ') }}\n"
+  - data:
+      title: "\U0001F525 Varmepumpe Justering"
+      message: '{{ message_body }}'
+      data:
+        priority: high
+        channel: Varmepumpe
+    service: notify.mobile_app_pixel_9a
+  mode: single
+- id: '1764859108898'
+  alias: Varme i Evelina sitt rom automatisk
+  description: ''
+  trigger:
+  - entity_id: person.evelina
+    platform: state
+  action:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: person.evelina
+        state: home
+      sequence:
+      - target:
+          entity_id: climate.evelina_900w
+        data:
+          hvac_mode: heat
+        action: climate.set_hvac_mode
+    - conditions:
+      - condition: state
+        entity_id: person.evelina
+        state: not_home
+      sequence:
+      - target:
+          entity_id: climate.evelina_900w
+        data:
+          hvac_mode: 'off'
+        action: climate.set_hvac_mode
+  mode: single
+- id: '1765131298558'
+  alias: VVB av over 10Kw
+  description: Slår av Aeotec Heavy Duty når huset bruker over 10kW i 5 minutter
+  trigger:
+  - entity_id: sensor.tibber_pulse_samlevegen_17_power
+    above: 10000
+    for:
+      minutes: 5
+    platform: numeric_state
+  conditions: []
+  action:
+  - target:
+      entity_id: switch.aeotec_heavy_duty_switch
+    service: switch.turn_off
+  mode: single
+- id: '1765131346958'
+  alias: VVB på når forbruket er under 7kW
+  description: Slår på Aeotec Heavy Duty når forbruket går under 7kW i 2 minutter
+  trigger:
+  - entity_id: sensor.tibber_pulse_samlevegen_17_power
+    below: 7000
+    for:
+      minutes: 2
+    platform: numeric_state
+  condition:
+  - condition: state
+    entity_id: switch.aeotec_heavy_duty_switch
+    state: 'off'
+  action:
+  - target:
+      entity_id: switch.aeotec_heavy_duty_switch
+    service: switch.turn_on
+  mode: single
+- id: 8a37d4381ae74998aaa32f4492e9993c
+  alias: Chamber - Maximum RH Safety
+  description: Emergency stop at 95% RH to prevent condensation
+  trigger:
+  - entity_id: sensor.chamber_avg_humidity
+    above: 98
+    platform: numeric_state
+  action:
+  - target:
+      entity_id: switch.fogger_switch
+    service: switch.turn_off
+  - data:
+      title: '⚠️ HIGH ALARM: RH Too High'
+      message: 'Humidity at {{ states(''sensor.chamber_avg_humidity'') }}% -  humidifier
+        stopped. Check ventilation!
+
+        '
+      notification_id: high_rh_alarm
+    service: persistent_notification.create
+  mode: single
+- id: ventilation_time_pattern_v3
+  alias: 'Ventilation: Time Pattern (Udødelig)'
+  description: Kjører ventilasjon hver 5. minutt basert på systemklokke - kan ikke
+    feile (TEMP - kun vifter)
+  trigger:
+  - platform: time_pattern
+    minutes: /5
+  condition:
+  - condition: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    state: 'on'
+  action:
+  - service: switch.turn_on
+    target:
+      entity_id:
+      - switch.vifter_switch
+  - delay:
+      seconds: "{% if is_state('input_boolean.pinning_phase', 'on') %}\n  {{ states('input_number.ventilation_on_duration_pinning')
+        | int }}\n{% else %}\n  {{ states('input_number.ventilation_on_duration_fruiting')
+        | int }}\n{% endif %}\n"
+  - service: switch.turn_off
+    target:
+      entity_id:
+      - switch.vifter_switch
+  mode: single
+- id: vpd_control_fogger_burst_v3
+  alias: Fogger Burst
+  description: 10s fogger burst hver 90. sekund når VPD er for høy (økt frekvens for
+    mindre fluktuasjoner)
+  trigger:
+  - platform: time_pattern
+    minutes: /2
+    seconds: 0
+  - platform: time_pattern
+    minutes: /2
+    seconds: 30
+  condition:
+  - condition: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    state: 'on'
+  - condition: template
+    value_template: "{% set vpd = states('sensor.chamber_current_vpd_2') | float(0)
+      %} {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %} {% set
+      target_vpd = states('input_number.target_vpd_pinning') | float(0.15) if is_pinning\n
+      \                   else states('input_number.target_vpd_fruiting') | float(0.20)
+      %}\n{% set hyst = states('input_number.vpd_hysteresis') | float(0.01) %} {{
+      vpd > (target_vpd + hyst) }}\n"
+  action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.fogger_switch
+  - delay:
+      seconds: 12
+  - service: switch.turn_off
+    target:
+      entity_id: switch.fogger_switch
+  mode: restart
+- id: vpd_control_emergency_stop_v3
+  alias: Emergency Stop
+  description: Stopper fogger umiddelbart hvis VPD normaliseres under burst/cooldown
+  trigger:
+  - platform: template
+    value_template: "{% set vpd = states('sensor.chamber_current_vpd_2') | float(0)
+      %} {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %} {% set
+      target_vpd = states('input_number.target_vpd_pinning') | float(0.15) if is_pinning\n
+      \                   else states('input_number.target_vpd_fruiting') | float(0.20)
+      %}\n{% set hyst = states('input_number.vpd_hysteresis') | float(0.01) %} {{
+      vpd < (target_vpd - hyst) }}\n"
+  condition:
+  - condition: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    state: 'on'
+  - condition: state
+    entity_id: switch.fogger_switch
+    state: 'on'
+  action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.fogger_switch
+  mode: single
+- id: fogger_watchdog_safety
+  alias: 'Fogger Watchdog: Safety Shutoff'
+  description: Slår av fogger automatisk hvis den står på lengre enn 30 sekunder
+  trigger:
+  - platform: state
+    entity_id: switch.fogger_switch
+    to: 'on'
+    for:
+      seconds: 30
+  action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.fogger_switch
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ⚠️ Fogger Watchdog
+      message: Fogger ble automatisk slått AV etter 30s. Sjekk VPD automation!
+      data:
+        priority: high
+        channel: VPD_Alerts
+  mode: single
+- id: sopp_tracker_frontend_autostart
+  alias: 'Sopp Tracker: Auto-start frontend ved HASS oppstart'
+  description: Starter Sopp Tracker frontend automatisk når Home Assistant restarter
+  trigger:
+  - event: start
+    platform: homeassistant
+  conditions: []
+  action:
+  - delay:
+      seconds: 30
+  - service: shell_command.start_sopp_frontend
+  - service: persistent_notification.create
+    data:
+      title: "\U0001F344 Sopp Tracker Frontend Started"
+      message: Sopp Tracker frontend is now running on http://192.168.1.251:3001
+      notification_id: sopp_tracker_frontend_start
+  mode: single
+- id: vpd_critical_alert_mobile
+  alias: 'VPD Alert: Critical VPD Mobile Notification'
+  description: Sender push til mobil når VPD er kritisk høy i 15 minutter
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.chamber_current_vpd_2
+    above: 0.35
+    for:
+      minutes: 15
+  action:
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ⚠️ VPD Kritisk Høy!
+      message: VPD er {{ states('sensor.chamber_current_vpd_2') }} kPa i 15 minutter.
+        Sjekk fogger og ventilasjon!
+      data:
+        priority: high
+        channel: VPD_Alerts
+  mode: single
+- id: climate_health_critical_alert
+  alias: 'VPD Alert: Climate Health Critical'
+  description: Varsler når Climate Health Score er under 30% i 30 minutter
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.climate_health_score
+    below: 30
+    for:
+      minutes: 30
+  action:
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: "\U0001F6A8 Climate Health Kritisk!"
+      message: 'Climate Health er {{ states(''sensor.climate_health_score'') }}%.
+        VPD: {{ states(''sensor.chamber_current_vpd_2'') }} kPa'
+      data:
+        priority: high
+        channel: VPD_Alerts
+  mode: single
+- id: fogger_not_responding_alert
+  alias: 'VPD Alert: Fogger Not Responding'
+  description: Varsler hvis VPD forblir høy selv om foggeren kjører
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.chamber_current_vpd_2
+    above: 0.3
+    for:
+      minutes: 60
+  condition:
+  - condition: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    state: 'on'
+  action:
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ⚠️ Fogger Mulig Feil
+      message: VPD fortsatt {{ states('sensor.chamber_current_vpd_2') }} kPa etter
+        60 min. Sjekk vannivå/dyse!
+      data:
+        priority: high
+        channel: VPD_Alerts
+  mode: single
+- id: vpd_system_disable_automations
+  alias: 'VPD System: Disable All When Turned OFF'
+  description: Deaktiverer alle VPD-automasjoner og slår av hardware når systemet
+    slås av
+  trigger:
+  - platform: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    from: 'on'
+    to: 'off'
+  action:
+  - service: homeassistant.turn_off
+    target:
+      entity_id:
+      - automation.vpd_control_fogger_burst_v3
+      - automation.vpd_control_emergency_stop_v3
+      - automation.ventilation_time_pattern_v3
+    data:
+      stop_actions: true
+    continue_on_error: true
+  - service: switch.turn_off
+    target:
+      entity_id:
+      - switch.fogger_switch
+      - switch.vifter_switch
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ⛔ VPD System Stopped
+      message: 'VPD Control System deaktivert.
+
+
+        Automasjoner stoppet:
+
+        - Fogger Burst
+
+        - Emergency Stop
+
+        - Ventilation
+
+
+        Hardware slått av:
+
+        - Fogger
+
+        - Ventilasjon
+
+        '
+      data:
+        priority: high
+        channel: VPD_System
+  mode: single
+- id: vpd_system_enable_automations
+  alias: 'VPD System: Enable Critical Automations'
+  description: Aktiverer automatisk Fogger Burst og Emergency Stop når VPD-systemet
+    slås PÅ
+  trigger:
+  - platform: state
+    entity_id: input_boolean.ventilation_pulse_mode
+    to: 'on'
+  action:
+  - service: homeassistant.turn_on
+    target:
+      entity_id:
+      - automation.vpd_control_fogger_burst_v3
+      - automation.vpd_control_emergency_stop_v3
+      - automation.ventilation_time_pattern_v3
+    continue_on_error: true
+  - service: notify.mobile_app_pixel_9a
+    data:
+      title: ✅ VPD System Enabled
+      message: 'VPD Control System aktivert.
+
+
+        Automasjoner startet:
+
+        - Fogger Burst
+
+        - Emergency Stop
+
+        - Ventilation
+
+        '
+      data:
+        priority: high
+        channel: VPD_System
+  mode: single
+- id: '1768123443757'
+  alias: Netatmo sensor failsafe
+  description: 'Overvåker Netatmo inne-sensor og varsler hvis den ikke har oppdatert
+    seg på 30 minutter. Kjører hvert 5. minutt.
+
+    '
+  triggers:
+  - trigger: time_pattern
+    minutes: /5
+  conditions:
+  - condition: template
+    value_template: '{{ states(''sensor.netatmo_inne_temperature'') not in [''unknown'',
+      ''unavailable'', ''none''] }}'
+  actions:
+  - if:
+    - condition: template
+      value_template: '{{ (now() - states.sensor.netatmo_inne_temperature.last_updated).total_seconds()
+        > 1800 }}'
+    then:
+    - action: notify.mobile_app_pixel_9a
+      data:
+        title: ⚠️ Netatmo sensor timeout
+        message: 'Inne-sensor ikke oppdatert på 30+ min. Sist: {{ states.sensor.netatmo_inne_temperature.last_updated.strftime(''%H:%M'')
+          }}. Varmepumpe-styring kan være unøyaktig.'
+        data:
+          tag: netatmo_timeout
+          priority: high
+          channel: alarm
+  mode: single
+- id: '1768382096876'
+  alias: Evelina i fallet
+  description: Send notifikasjon raskt når Evelina kommer hjem til Lorenfallet.
+  triggers:
+  - entity_id: person.evelina
+    from: not_home
+    to: zone.lorenfallet
+    trigger: state
+  conditions:
+  - condition: zone
+    entity_id: person.aasmund
+    zone: zone.lorenfallet
+  actions:
+  - data:
+      message: Evelina hjemme
+      title: Hjemkomst
+      data:
+        priority: high
+        ttl: 0
+    action: notify.mobile_app_pixel_9a
+  mode: single
+- id: chamber_light_on_morning
+  alias: 'Chamber Light: Auto ON 06:00'
+  description: Slår på lyset i kammeret automatisk kl 06:00
+  triggers:
+  - trigger: time
+    at: 06:00:00
+  conditions: []
+  actions:
+  - service: light.turn_on
+    target:
+      entity_id: light.fruktenkammer
+  mode: single
+- id: chamber_light_off_evening
+  alias: 'Chamber Light: Auto OFF 18:00'
+  description: Slår av lyset i kammeret automatisk kl 18:00
+  triggers:
+  - trigger: time
+    at: '18:00:00'
+  conditions: []
+  actions:
+  - service: light.turn_off
+    target:
+      entity_id: light.fruktenkammer
+  mode: single
