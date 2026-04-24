@@ -1,0 +1,726 @@
+# HAB-9 Climate Dashboard
+# Deploy: Settings → Dashboards → Add → Mode: YAML → Path: /hab9_climate_dashboard.yaml
+# Requires: mushroom cards, apexcharts-card, card_mod (all via HACS)
+
+title: HAB-9 Climate
+views:
+  - title: Climate
+    path: climate
+    icon: mdi:mushroom
+    type: panel
+    cards:
+      - type: vertical-stack
+        cards:
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 1 — Hero: VPD gauge + Temp/RH + Toggle
+          # ─────────────────────────────────────────────
+          - type: horizontal-stack
+            cards:
+              # VPD GAUGE
+              - type: custom:apexcharts-card
+                chart_type: radialBar
+                series:
+                  - entity: sensor.chamber_current_vpd
+                    name: VPD
+                    max: 0.35
+                header:
+                  show: false
+                apex_config:
+                  chart:
+                    height: 260
+                    background: transparent
+                    type: radialBar
+                  theme:
+                    mode: dark
+                  plotOptions:
+                    radialBar:
+                      startAngle: -135
+                      endAngle: 135
+                      track:
+                        background: '#1a1a2e'
+                        strokeWidth: 90%
+                        margin: 4
+                      hollow:
+                        size: 55%
+                      dataLabels:
+                        name:
+                          show: false
+                        value:
+                          offsetY: 8
+                          fontSize: '36px'
+                          fontWeight: 700
+                          color: '#00E5FF'
+                          formatter: "function(val) { return (val/100*0.35).toFixed(2)+' kPa'; }"
+                  fill:
+                    type: gradient
+                    gradient:
+                      colorStops:
+                        - offset: 0
+                          color: '#4CAF50'
+                          opacity: 1
+                        - offset: 45
+                          color: '#FFEB3B'
+                          opacity: 1
+                        - offset: 100
+                          color: '#F44336'
+                          opacity: 1
+                  grid:
+                    show: false
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+
+              # TEMP + RH + SYSTEM TOGGLE
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: input_boolean.system_enabled
+                    name: HAB-9 SYSTEM
+                    icon: mdi:hvac
+                    tap_action:
+                      action: toggle
+                    card_mod:
+                      style: |
+                        ha-card {
+                          background: {% if is_state('input_boolean.system_enabled', 'on') %}
+                            linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)
+                          {% else %}
+                            linear-gradient(135deg, #7f0000 0%, #c62828 100%)
+                          {% endif %} !important;
+                          border-radius: 14px;
+                          margin-bottom: 8px;
+                        }
+                  - type: custom:mushroom-template-card
+                    primary: "{{ states('sensor.chamber_avg_temp') }} °C"
+                    secondary: >
+                      {% set c = states('sensor.temp_change_5min') | float(0) %}
+                      {% if c > 0.1 %}↑ stiger{% elif c < -0.1 %}↓ synker{% else %}→ stabil{% endif %}
+                    icon: mdi:thermometer
+                    icon_color: >
+                      {% set t = states('sensor.chamber_avg_temp') | float(18) %}
+                      {% if t < 14 or t > 20 %}red{% elif t < 15 or t > 19 %}orange{% else %}green{% endif %}
+                    card_mod:
+                      style: |
+                        ha-card {
+                          background: rgba(255,107,53,0.15);
+                          border-left: 3px solid #FF6B35;
+                          border-radius: 14px;
+                          margin-bottom: 8px;
+                        }
+                        .primary { font-size: 28px !important; font-weight: 700 !important; color: #FF6B35 !important; }
+                  - type: custom:mushroom-template-card
+                    primary: "{{ states('sensor.chamber_avg_humidity') }} %"
+                    secondary: >
+                      {% set c = states('sensor.humidity_change_5min') | float(0) %}
+                      {% if c > 0.3 %}↑ stiger{% elif c < -0.3 %}↓ synker{% else %}→ stabil{% endif %}
+                    icon: mdi:water-percent
+                    icon_color: >
+                      {% set h = states('sensor.chamber_avg_humidity') | float(90) %}
+                      {% if h > 98 %}red{% elif h > 96 %}orange{% else %}green{% endif %}
+                    card_mod:
+                      style: |
+                        ha-card {
+                          background: rgba(105,255,71,0.10);
+                          border-left: 3px solid #69FF47;
+                          border-radius: 14px;
+                        }
+                        .primary { font-size: 28px !important; font-weight: 700 !important; color: #69FF47 !important; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 2 — Live trend: VPD + Humidity (6h)
+          # ─────────────────────────────────────────────
+          - type: custom:apexcharts-card
+            graph_span: 6h
+            update_interval: 30s
+            header:
+              show: true
+              title: "VPD & Fuktighet — 6 timer"
+              colorize_states: true
+            all_series_config:
+              curve: smooth
+              group_by:
+                func: avg
+                duration: 2min
+            series:
+              - entity: sensor.chamber_current_vpd
+                name: VPD
+                type: area
+                yaxis_id: vpd
+                color: '#00E5FF'
+                stroke_width: 2
+                opacity: 0.15
+                fill_raw: last
+              - entity: sensor.chamber_avg_humidity
+                name: Fuktighet
+                type: area
+                yaxis_id: rh
+                color: '#69FF47'
+                stroke_width: 2
+                opacity: 0.10
+                fill_raw: last
+              - entity: input_number.target_vpd_fruiting
+                name: Target VPD
+                type: line
+                yaxis_id: vpd
+                color: '#FFFFFF'
+                stroke_width: 1
+                opacity: 0.5
+                group_by:
+                  func: raw
+            yaxis:
+              - id: vpd
+                min: 0.00
+                max: 0.30
+                decimals: 2
+                apex_config:
+                  title:
+                    text: VPD (kPa)
+                    style:
+                      color: '#00E5FF'
+                      fontSize: 11px
+              - id: rh
+                opposite: true
+                min: 85
+                max: 100
+                decimals: 0
+                apex_config:
+                  title:
+                    text: RH (%)
+                    style:
+                      color: '#69FF47'
+                      fontSize: 11px
+            apex_config:
+              chart:
+                background: transparent
+                height: 200
+              theme:
+                mode: dark
+              grid:
+                borderColor: 'rgba(255,255,255,0.06)'
+              legend:
+                show: true
+                position: top
+                fontSize: 11px
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 3 — Temperatur (12h)
+          # ─────────────────────────────────────────────
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: "Temperatur — 12 timer"
+            all_series_config:
+              curve: smooth
+              group_by:
+                func: avg
+                duration: 5min
+            series:
+              - entity: sensor.chamber_avg_temp
+                name: Temperatur
+                type: area
+                color: '#FF6B35'
+                stroke_width: 2
+                opacity: 0.20
+                fill_raw: last
+              - entity: sensor.chamber_avg_temp
+                name: Fruiting 17°C
+                type: line
+                color: '#FD79A8'
+                stroke_width: 1
+                opacity: 0.5
+                transform: 'return 17;'
+                group_by:
+                  func: raw
+              - entity: sensor.chamber_avg_temp
+                name: Pinning 15°C
+                type: line
+                color: '#74B9FF'
+                stroke_width: 1
+                opacity: 0.5
+                transform: 'return 15;'
+                group_by:
+                  func: raw
+            yaxis:
+              - min: 13
+                max: 21
+                decimals: 1
+                apex_config:
+                  title:
+                    text: Temp (°C)
+                    style:
+                      color: '#FF6B35'
+                      fontSize: 11px
+            apex_config:
+              chart:
+                background: transparent
+                height: 170
+              theme:
+                mode: dark
+              grid:
+                borderColor: 'rgba(255,255,255,0.06)'
+              legend:
+                show: true
+                position: top
+                fontSize: 11px
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 4 — Aktivitetsheatmap (Fogger + Vifte, 3h)
+          # ─────────────────────────────────────────────
+          - type: custom:apexcharts-card
+            graph_span: 3h
+            update_interval: 15s
+            header:
+              show: true
+              title: "Fogger & Vifte aktivitet"
+            all_series_config:
+              type: area
+              curve: stepline
+              stroke_width: 0
+              fill_raw: last
+              group_by:
+                func: raw
+            yaxis:
+              - id: left
+                min: 0
+                max: 3
+                show: false
+            series:
+              - entity: switch.fogger_switch
+                name: Fogger
+                color: '#69FF47'
+                yaxis_id: left
+                opacity: 0.85
+                transform: "return x === 'on' ? 2.8 : 0.02;"
+              - entity: switch.vifter_switch
+                name: Vifte
+                color: '#00B4D8'
+                yaxis_id: left
+                opacity: 0.70
+                transform: "return x === 'on' ? 1.7 : 0.02;"
+            apex_config:
+              chart:
+                background: transparent
+                height: 110
+                sparkline:
+                  enabled: false
+              theme:
+                mode: dark
+              grid:
+                show: false
+              legend:
+                show: true
+                position: top
+                fontSize: 11px
+              xaxis:
+                labels:
+                  style:
+                    fontSize: 10px
+              annotations:
+                yaxis:
+                  - y: 2.3
+                    y2: 2.8
+                    fillColor: '#69FF47'
+                    opacity: 0.05
+                    label:
+                      text: Fogger
+                      style:
+                        color: '#69FF47'
+                        fontSize: 9px
+                  - y: 1.2
+                    y2: 1.7
+                    fillColor: '#00B4D8'
+                    opacity: 0.05
+                    label:
+                      text: Vifte
+                      style:
+                        color: '#00B4D8'
+                        fontSize: 9px
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 5 — Climate Health 3t
+          # ─────────────────────────────────────────────
+          - type: horizontal-stack
+            cards:
+              # TRE RINGER
+              - type: custom:apexcharts-card
+                chart_type: radialBar
+                series:
+                  - entity: sensor.vpd_accuracy_3h
+                    name: VPD presisjon
+                    color: '#00E5FF'
+                    transform: 'return x * 100;'
+                    max: 1
+                  - entity: sensor.rh_stability_score
+                    name: RH stabilitet
+                    color: '#69FF47'
+                  - entity: sensor.system_uptime_3h
+                    name: Systemoppetid
+                    color: '#FFB347'
+                    transform: 'return x * 100;'
+                    max: 1
+                apex_config:
+                  chart:
+                    background: transparent
+                    height: 230
+                    type: radialBar
+                  theme:
+                    mode: dark
+                  plotOptions:
+                    radialBar:
+                      hollow:
+                        size: 25%
+                      track:
+                        background: '#1a1a2e'
+                      dataLabels:
+                        name:
+                          fontSize: '10px'
+                        value:
+                          fontSize: '13px'
+                          fontWeight: 600
+                          formatter: "function(val) { return Math.round(val)+'%'; }"
+                        total:
+                          show: true
+                          label: 'Climate Health'
+                          fontSize: '11px'
+                          fontWeight: 700
+                          color: '#ffffff'
+                          formatter: >
+                            function(w) {
+                              const v = w.globals.series;
+                              const avg = v.reduce((a,b)=>a+b,0)/v.length;
+                              return Math.round(avg)+'%';
+                            }
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+
+              # NUMERISKE VERDIER
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-template-card
+                    primary: >
+                      {{ (states('sensor.vpd_accuracy_3h') | float(0) * 100) | round(0) }}%
+                    secondary: VPD innenfor target siste 3t
+                    icon: mdi:crosshairs-gps
+                    icon_color: >
+                      {% set v = states('sensor.vpd_accuracy_3h') | float(0) * 100 %}
+                      {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(0,229,255,0.08); border-radius: 14px; margin-bottom: 8px; }
+                  - type: custom:mushroom-template-card
+                    primary: "{{ states('sensor.rh_stability_score') }}%"
+                    secondary: RH stabilitet (std.dev 3t)
+                    icon: mdi:wave
+                    icon_color: >
+                      {% set v = states('sensor.rh_stability_score') | int(0) %}
+                      {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(105,255,71,0.08); border-radius: 14px; margin-bottom: 8px; }
+                  - type: custom:mushroom-template-card
+                    primary: >
+                      {{ (states('sensor.system_uptime_3h') | float(0) * 100) | round(0) }}%
+                    secondary: System aktiv siste 3t
+                    icon: mdi:power
+                    icon_color: >
+                      {% set v = states('sensor.system_uptime_3h') | float(0) * 100 %}
+                      {% if v > 95 %}green{% elif v > 80 %}orange{% else %}red{% endif %}
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(255,179,71,0.08); border-radius: 14px; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 6 — Kontrollpanel
+          # ─────────────────────────────────────────────
+          - type: vertical-stack
+            cards:
+              # HEADER med fase-status
+              - type: custom:mushroom-title-card
+                title: Kontrollpanel
+                subtitle: >
+                  {% if is_state('input_boolean.pinning_phase', 'on') %}
+                    🌱 Pinning-fase aktiv
+                  {% else %}
+                    🍄 Fruiting-fase aktiv
+                  {% endif %}
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px 18px 0 0; padding: 8px; }
+
+              # FASE-KNAPPER
+              - type: horizontal-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: input_boolean.pinning_phase
+                    name: Pinning 🌱
+                    icon: mdi:sprout
+                    tap_action:
+                      action: toggle
+                    card_mod:
+                      style: |
+                        ha-card {
+                          background: {% if is_state('input_boolean.pinning_phase', 'on') %}
+                            linear-gradient(135deg,#1565C0,#1976D2)
+                          {% else %}
+                            rgba(30,30,40,0.85)
+                          {% endif %};
+                          border-radius: 12px;
+                        }
+                  - type: custom:mushroom-entity-card
+                    entity: input_boolean.pinning_phase
+                    name: Fruiting 🍄
+                    icon: mdi:mushroom
+                    tap_action:
+                      action: call-service
+                      service: input_boolean.turn_off
+                      service_data:
+                        entity_id: input_boolean.pinning_phase
+                    card_mod:
+                      style: |
+                        ha-card {
+                          background: {% if is_state('input_boolean.pinning_phase', 'off') %}
+                            linear-gradient(135deg,#4A148C,#6A1B9A)
+                          {% else %}
+                            rgba(30,30,40,0.85)
+                          {% endif %};
+                          border-radius: 12px;
+                        }
+
+              # VPD TARGETS
+              - type: grid
+                columns: 2
+                cards:
+                  - type: custom:mushroom-number-card
+                    entity: input_number.target_vpd_fruiting
+                    name: Target VPD Fruiting
+                    icon: mdi:mushroom
+                    display_mode: buttons
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
+                  - type: custom:mushroom-number-card
+                    entity: input_number.target_vpd_pinning
+                    name: Target VPD Pinning
+                    icon: mdi:sprout
+                    display_mode: buttons
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
+                  - type: custom:mushroom-number-card
+                    entity: input_number.vpd_hysteresis
+                    name: Hysterese
+                    icon: mdi:delta
+                    display_mode: buttons
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(255,255,255,0.06); border-radius: 12px; }
+                  - type: custom:mushroom-template-card
+                    primary: >
+                      {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+                      {% set t = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
+                      {% set h = states('input_number.vpd_hysteresis') | float(0.02) %}
+                      ON > {{ (t+h) | round(2) }} kPa
+                      OFF < {{ (t-h) | round(2) }} kPa
+                    secondary: Fogger trigger-soner
+                    icon: mdi:water
+                    icon_color: cyan
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(0,229,255,0.08); border-radius: 12px; }
+
+              # ACH KONTROLL
+              - type: grid
+                columns: 2
+                cards:
+                  - type: custom:mushroom-number-card
+                    entity: input_number.ach_target_fruiting
+                    name: ACH Fruiting
+                    icon: mdi:fan-speed-3
+                    display_mode: buttons
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
+                  - type: custom:mushroom-number-card
+                    entity: input_number.ach_target_pinning
+                    name: ACH Pinning
+                    icon: mdi:fan-speed-1
+                    display_mode: buttons
+                    card_mod:
+                      style: |
+                        ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
+
+              # LIVE ACH-KALKULATOR
+              - type: custom:mushroom-template-card
+                primary: >
+                  {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+                  {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
+                  {% set off = ((3600 / ach) - 120) | int %}
+                  Fan 120s ON · {{ off }}s OFF · Syklus {{ (3600/ach)|int }}s
+                secondary: >
+                  {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+                  {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
+                  Duty cycle {{ (120 / (3600 / ach) * 100) | round(1) }}%
+                icon: mdi:fan-clock
+                icon_color: orange
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(255,107,53,0.10); border-radius: 12px; }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 7 — Diagnostics
+          # ─────────────────────────────────────────────
+          - type: grid
+            columns: 2
+            cards:
+              # NESTE FAN-SYKLUS
+              - type: custom:mushroom-template-card
+                entity: timer.ventilation_cycle
+                primary: >
+                  {% set s = state_attr('timer.ventilation_cycle', 'remaining') %}
+                  {% if is_state('timer.ventilation_cycle', 'active') and s %}
+                    {{ s.split('.')[0] }}
+                  {% elif is_state('timer.fan_on', 'active') %}
+                    Fan kjører nå
+                  {% else %}
+                    Inaktiv
+                  {% endif %}
+                secondary: Neste ventilasjonssyklus
+                icon: mdi:timer-outline
+                icon_color: >
+                  {% if is_state('timer.fan_on', 'active') %}orange
+                  {% elif is_state('timer.ventilation_cycle', 'active') %}cyan
+                  {% else %}grey{% endif %}
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
+
+              # SENSOR HELSE
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.sensor_health_status') }}"
+                secondary: Sensor status
+                icon: mdi:access-point
+                icon_color: >
+                  {% if states('sensor.sensor_health_status') == 'All Sensors Online' %}green
+                  {% elif 'Fallback' in states('sensor.sensor_health_status') %}orange
+                  {% else %}red{% endif %}
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
+
+              # FOGGER STATUS
+              - type: custom:mushroom-entity-card
+                entity: switch.fogger_switch
+                name: Fogger
+                icon: mdi:water-outline
+                tap_action:
+                  action: toggle
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: {% if is_state('switch.fogger_switch', 'on') %}
+                        rgba(105,255,71,0.20)
+                      {% else %}
+                        rgba(30,30,40,0.85)
+                      {% endif %};
+                      border-radius: 14px;
+                    }
+
+              # VIFTE STATUS
+              - type: custom:mushroom-entity-card
+                entity: switch.vifter_switch
+                name: Vifte
+                icon: mdi:fan
+                tap_action:
+                  action: toggle
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: {% if is_state('switch.vifter_switch', 'on') %}
+                        rgba(0,180,216,0.20)
+                      {% else %}
+                        rgba(30,30,40,0.85)
+                      {% endif %};
+                      border-radius: 14px;
+                    }
+
+          # ─────────────────────────────────────────────
+          # SEKSJON 8 — Inkubasjon (12h)
+          # ─────────────────────────────────────────────
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            update_interval: 5min
+            header:
+              show: true
+              title: "Inkubasjon — 12 timer"
+            all_series_config:
+              curve: smooth
+              group_by:
+                func: avg
+                duration: 5min
+            series:
+              - entity: sensor.incubation_avg_temp
+                name: Temp
+                type: area
+                yaxis_id: temp
+                color: '#A29BFE'
+                stroke_width: 2
+                opacity: 0.15
+                fill_raw: last
+              - entity: sensor.incubation_avg_humidity
+                name: Fuktighet
+                type: area
+                yaxis_id: rh
+                color: '#DFE6E9'
+                stroke_width: 2
+                opacity: 0.10
+                fill_raw: last
+            yaxis:
+              - id: temp
+                min: 17
+                max: 23
+                decimals: 1
+                apex_config:
+                  title:
+                    text: Temp (°C)
+                    style:
+                      color: '#A29BFE'
+                      fontSize: 11px
+              - id: rh
+                opposite: true
+                min: 60
+                max: 90
+                decimals: 0
+                apex_config:
+                  title:
+                    text: RH (%)
+                    style:
+                      color: '#DFE6E9'
+                      fontSize: 11px
+            apex_config:
+              chart:
+                background: transparent
+                height: 170
+              theme:
+                mode: dark
+              grid:
+                borderColor: 'rgba(255,255,255,0.06)'
+              legend:
+                show: true
+                position: top
+                fontSize: 11px
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }

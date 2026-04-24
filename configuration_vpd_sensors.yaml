@@ -453,6 +453,34 @@ template:
           previous_value: "{{ states('sensor.chamber_avg_humidity') | float(0) }}"
           current_value: "{{ states('sensor.chamber_avg_humidity') | float(0) }}"
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # CLIMATE HEALTH — RH Stability Score (bruker rh_std_dev_3h statistics-sensor)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: "RH Stability Score"
+        unique_id: rh_stability_score
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        state: >
+          {% set std = states('sensor.rh_std_dev_3h') | float(0) %}
+          {{ [((1 - (std / 4)) * 100) | round(0) | int, 0] | max }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CLIMATE HEALTH — VPD In Range binary sensor
+  # ─────────────────────────────────────────────────────────────────────────────
+  - binary_sensor:
+      - name: "VPD In Range"
+        unique_id: vpd_in_range
+        state: >
+          {% set vpd = states('sensor.chamber_current_vpd') | float(-1) %}
+          {% if vpd < 0 %}
+            {{ false }}
+          {% else %}
+            {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+            {% set target = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
+            {% set hyst = states('input_number.vpd_hysteresis') | float(0.02) %}
+            {{ vpd >= (target - hyst) and vpd <= (target + hyst) }}
+          {% endif %}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # STATISTICS SENSORS - 24h AVERAGES (for morgenrapport)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -501,3 +529,33 @@ sensor:
     type: time
     start: "{{ now() - timedelta(hours=24) }}"
     end: "{{ now() }}"
+
+  # Climate Health — 3h backend sensors (dashboard)
+  - platform: history_stats
+    name: "VPD Accuracy 3h"
+    unique_id: vpd_accuracy_3h
+    entity_id: binary_sensor.vpd_in_range
+    state: 'on'
+    type: ratio
+    duration:
+      hours: 3
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: "System Uptime 3h"
+    unique_id: system_uptime_3h
+    entity_id: input_boolean.system_enabled
+    state: 'on'
+    type: ratio
+    duration:
+      hours: 3
+    end: "{{ now() }}"
+
+  - platform: statistics
+    name: "RH Std Dev 3h"
+    unique_id: rh_std_dev_3h
+    entity_id: sensor.chamber_avg_humidity
+    state_characteristic: standard_deviation
+    max_age:
+      hours: 3
+    precision: 2
