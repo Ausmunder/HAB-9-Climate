@@ -48,4 +48,4 @@ vpd_hysteresis:
   step: 0.01
   unit_of_measurement: "kPa"
   icon: mdi:delta
-  initial: 0.02
+  initial: 0.01
