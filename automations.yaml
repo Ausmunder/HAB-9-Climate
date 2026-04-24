@@ -968,13 +968,28 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 - id: fogger_watchdog_safety
   alias: 'Fogger Watchdog: Safety Shutoff'
-  description: Slår av fogger automatisk hvis den står på lengre enn 30 sekunder
+  description: >
+    Safety: slår av fogger automatisk hvis den har stått på i 10+ min mens VPD
+    allerede er under target (= fogger er fastlåst åpen). Ikke design for burst-modus
+    – fogger_control_loop styrer normal drift.
   trigger:
   - platform: state
     entity_id: switch.fogger_switch
     to: 'on'
     for:
-      seconds: 30
+      minutes: 10
+  condition:
+  - condition: template
+    value_template: >
+      {% set vpd = states('sensor.chamber_current_vpd') | float(-1) %}
+      {% if vpd < 0 %}
+        false
+      {% else %}
+        {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+        {% set target = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
+        {% set hyst = states('input_number.vpd_hysteresis') | float(0.02) %}
+        {{ vpd < (target - hyst) }}
+      {% endif %}
   action:
   - service: switch.turn_off
     target:
@@ -982,7 +997,9 @@
   - service: notify.mobile_app_pixel_9a
     data:
       title: '⚠️ Fogger Watchdog'
-      message: 'Fogger ble automatisk slått AV etter 30s. Sjekk VPD automation!'
+      message: >
+        Fogger fastlåst ON i 10+ min mens VPD={{ states('sensor.chamber_current_vpd') }} kPa
+        (under target). Tvangsstopp utført.
       data:
         priority: high
         channel: VPD_Alerts
