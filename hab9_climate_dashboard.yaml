@@ -360,16 +360,15 @@ views:
                   - entity: sensor.vpd_accuracy_3h
                     name: VPD presisjon
                     color: '#00E5FF'
-                    transform: 'return x * 100;'
-                    max: 1
+                    max: 100
                   - entity: sensor.rh_stability_score
                     name: RH stabilitet
                     color: '#69FF47'
+                    max: 100
                   - entity: sensor.system_uptime_3h
                     name: Systemoppetid
                     color: '#FFB347'
-                    transform: 'return x * 100;'
-                    max: 1
+                    max: 100
                 apex_config:
                   chart:
                     background: transparent
@@ -411,11 +410,11 @@ views:
                 cards:
                   - type: custom:mushroom-template-card
                     primary: >
-                      {{ (states('sensor.vpd_accuracy_3h') | float(0) * 100) | round(0) }}%
+                      {{ states('sensor.vpd_accuracy_3h') | float(0) | round(0) }}%
                     secondary: VPD innenfor target siste 3t
                     icon: mdi:crosshairs-gps
                     icon_color: >
-                      {% set v = states('sensor.vpd_accuracy_3h') | float(0) * 100 %}
+                      {% set v = states('sensor.vpd_accuracy_3h') | float(0) %}
                       {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
                     card_mod:
                       style: |
@@ -432,11 +431,11 @@ views:
                         ha-card { background: rgba(105,255,71,0.08); border-radius: 14px; margin-bottom: 8px; }
                   - type: custom:mushroom-template-card
                     primary: >
-                      {{ (states('sensor.system_uptime_3h') | float(0) * 100) | round(0) }}%
+                      {{ states('sensor.system_uptime_3h') | float(0) | round(0) }}%
                     secondary: System aktiv siste 3t
                     icon: mdi:power
                     icon_color: >
-                      {% set v = states('sensor.system_uptime_3h') | float(0) * 100 %}
+                      {% set v = states('sensor.system_uptime_3h') | float(0) %}
                       {% if v > 95 %}green{% elif v > 80 %}orange{% else %}red{% endif %}
                     card_mod:
                       style: |
