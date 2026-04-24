@@ -462,12 +462,16 @@ views:
               # FASE-KNAPPER
               - type: horizontal-stack
                 cards:
-                  - type: custom:mushroom-entity-card
-                    entity: input_boolean.pinning_phase
-                    name: Pinning 🌱
+                  - type: custom:mushroom-template-card
+                    primary: "Pinning 🌱"
+                    secondary: >
+                      {% if is_state('input_boolean.pinning_phase', 'on') %}Aktiv{% else %}Inaktiv{% endif %}
                     icon: mdi:sprout
                     tap_action:
-                      action: toggle
+                      action: call-service
+                      service: input_boolean.turn_on
+                      service_data:
+                        entity_id: input_boolean.pinning_phase
                     card_mod:
                       style: |
                         ha-card {
@@ -478,9 +482,10 @@ views:
                           {% endif %};
                           border-radius: 12px;
                         }
-                  - type: custom:mushroom-entity-card
-                    entity: input_boolean.pinning_phase
-                    name: Fruiting 🍄
+                  - type: custom:mushroom-template-card
+                    primary: "Fruiting 🍄"
+                    secondary: >
+                      {% if is_state('input_boolean.pinning_phase', 'off') %}Aktiv{% else %}Inaktiv{% endif %}
                     icon: mdi:mushroom
                     tap_action:
                       action: call-service
