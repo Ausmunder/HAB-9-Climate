@@ -372,172 +372,172 @@ views:
       # ═══════════════════════════════════════════
       - cards:
 
-          # ─── Kontrollpanel ───
-          - type: vertical-stack
-            cards:
-              # HEADER med fase-status
-              - type: custom:mushroom-title-card
-                title: Kontrollpanel
-                subtitle: >
-                  {% if is_state('input_boolean.pinning_phase', 'on') %}
-                    🌱 Pinning-fase aktiv
-                  {% else %}
-                    🍄 Fruiting-fase aktiv
-                  {% endif %}
-                card_mod:
-                  style: |
-                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px 18px 0 0; padding: 8px; }
+          # ─── Fase-header ───
+          - type: custom:mushroom-title-card
+            title: Kontrollpanel
+            subtitle: >
+              {% if is_state('input_boolean.pinning_phase', 'on') %}
+                🌱 Pinning-fase aktiv
+              {% else %}
+                🍄 Fruiting-fase aktiv
+              {% endif %}
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; padding: 8px; }
 
-              # FASE-KNAPPER
-              - type: horizontal-stack
-                cards:
-                  - type: custom:mushroom-template-card
-                    primary: "Pinning 🌱"
-                    secondary: >
-                      {% if is_state('input_boolean.pinning_phase', 'on') %}Aktiv{% else %}Inaktiv{% endif %}
-                    icon: mdi:sprout
-                    tap_action:
-                      action: call-service
-                      service: input_boolean.turn_on
-                      service_data:
-                        entity_id: input_boolean.pinning_phase
-                    card_mod:
-                      style: |
-                        ha-card {
-                          background: {% if is_state('input_boolean.pinning_phase', 'on') %}
-                            linear-gradient(135deg,#1565C0,#1976D2)
-                          {% else %}
-                            rgba(30,30,40,0.85)
-                          {% endif %};
-                          border-radius: 12px;
-                        }
-                  - type: custom:mushroom-template-card
-                    primary: "Fruiting 🍄"
-                    secondary: >
-                      {% if is_state('input_boolean.pinning_phase', 'off') %}Aktiv{% else %}Inaktiv{% endif %}
-                    icon: mdi:mushroom
-                    tap_action:
-                      action: call-service
-                      service: input_boolean.turn_off
-                      service_data:
-                        entity_id: input_boolean.pinning_phase
-                    card_mod:
-                      style: |
-                        ha-card {
-                          background: {% if is_state('input_boolean.pinning_phase', 'off') %}
-                            linear-gradient(135deg,#4A148C,#6A1B9A)
-                          {% else %}
-                            rgba(30,30,40,0.85)
-                          {% endif %};
-                          border-radius: 12px;
-                        }
-
-              # VPD TARGETS
-              - type: grid
-                columns: 2
-                cards:
-                  - type: custom:mushroom-number-card
-                    entity: input_number.target_vpd_fruiting
-                    name: Target VPD Fruiting
-                    icon: mdi:mushroom
-                    display_mode: buttons
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
-                  - type: custom:mushroom-number-card
-                    entity: input_number.target_vpd_pinning
-                    name: Target VPD Pinning
-                    icon: mdi:sprout
-                    display_mode: buttons
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
-                  - type: custom:mushroom-number-card
-                    entity: input_number.vpd_hysteresis
-                    name: Hysterese
-                    icon: mdi:delta
-                    display_mode: buttons
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(255,255,255,0.06); border-radius: 12px; }
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-                      {% set t = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
-                      {% set h = states('input_number.vpd_hysteresis') | float(0.02) %}
-                      ON > {{ (t+h) | round(2) }} kPa
-                      OFF < {{ (t-h) | round(2) }} kPa
-                    secondary: Fogger trigger-soner
-                    icon: mdi:water
-                    icon_color: cyan
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(0,229,255,0.08); border-radius: 12px; }
-
-              # ACH KONTROLL
-              - type: grid
-                columns: 2
-                cards:
-                  - type: custom:mushroom-number-card
-                    entity: input_number.ach_target_fruiting
-                    name: ACH Fruiting
-                    icon: mdi:fan-speed-3
-                    display_mode: buttons
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
-                  - type: custom:mushroom-number-card
-                    entity: input_number.ach_target_pinning
-                    name: ACH Pinning
-                    icon: mdi:fan-speed-1
-                    display_mode: buttons
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
-
-              # LIVE ACH-KALKULATOR
-              - type: custom:mushroom-template-card
-                primary: >
-                  {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-                  {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
-                  {% set half = (((3600 / ach) - 120) / 2) | int %}
-                  2×60s ON · gap {{ half }}s · syklus {{ (3600/ach)|int }}s
-                secondary: >
-                  {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-                  {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
-                  Duty cycle {{ (120 / (3600 / ach) * 100) | round(1) }}% · gap mellom burst: {{ (((3600 / ach) - 120) / 2) | int }}s
-                icon: mdi:fan-clock
-                icon_color: orange
-                card_mod:
-                  style: |
-                    ha-card { background: rgba(255,107,53,0.10); border-radius: 12px; }
-
-          # ─── Diagnostics ───
+          # ─── Fase-knapper (same-type pair → 2-col grid) ───
           - type: grid
             columns: 2
             cards:
-              # NESTE FAN-SYKLUS — type:entity viser innebygd live-nedtelling
-              - type: entity
-                entity: timer.ventilation_cycle
-                name: Ventilasjonssyklus
-                card_mod:
-                  style: |
-                    ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
-
-              # SENSOR HELSE
               - type: custom:mushroom-template-card
-                primary: "{{ states('sensor.sensor_health_status') }}"
-                secondary: Sensor status
-                icon: mdi:access-point
-                icon_color: >
-                  {% if states('sensor.sensor_health_status') == 'All Sensors Online' %}green
-                  {% elif 'Fallback' in states('sensor.sensor_health_status') %}orange
-                  {% else %}red{% endif %}
+                primary: "Pinning 🌱"
+                secondary: >
+                  {% if is_state('input_boolean.pinning_phase', 'on') %}Aktiv{% else %}Inaktiv{% endif %}
+                icon: mdi:sprout
+                tap_action:
+                  action: call-service
+                  service: input_boolean.turn_on
+                  service_data:
+                    entity_id: input_boolean.pinning_phase
                 card_mod:
                   style: |
-                    ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
+                    ha-card {
+                      background: {% if is_state('input_boolean.pinning_phase', 'on') %}
+                        linear-gradient(135deg,#1565C0,#1976D2)
+                      {% else %}
+                        rgba(30,30,40,0.85)
+                      {% endif %};
+                      border-radius: 12px;
+                    }
+              - type: custom:mushroom-template-card
+                primary: "Fruiting 🍄"
+                secondary: >
+                  {% if is_state('input_boolean.pinning_phase', 'off') %}Aktiv{% else %}Inaktiv{% endif %}
+                icon: mdi:mushroom
+                tap_action:
+                  action: call-service
+                  service: input_boolean.turn_off
+                  service_data:
+                    entity_id: input_boolean.pinning_phase
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: {% if is_state('input_boolean.pinning_phase', 'off') %}
+                        linear-gradient(135deg,#4A148C,#6A1B9A)
+                      {% else %}
+                        rgba(30,30,40,0.85)
+                      {% endif %};
+                      border-radius: 12px;
+                    }
 
-              # FOGGER STATUS
+          # ─── VPD targets (same-type pair → 2-col grid) ───
+          - type: grid
+            columns: 2
+            cards:
+              - type: custom:mushroom-number-card
+                entity: input_number.target_vpd_fruiting
+                name: Target VPD Fruiting
+                icon: mdi:mushroom
+                display_mode: buttons
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
+              - type: custom:mushroom-number-card
+                entity: input_number.target_vpd_pinning
+                name: Target VPD Pinning
+                icon: mdi:sprout
+                display_mode: buttons
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
+
+          # ─── Hysterese (full-width — ingen matchende partner) ───
+          - type: custom:mushroom-number-card
+            entity: input_number.vpd_hysteresis
+            name: Hysterese
+            icon: mdi:delta
+            display_mode: buttons
+            card_mod:
+              style: |
+                ha-card { background: rgba(255,255,255,0.06); border-radius: 12px; }
+
+          # ─── Fogger trigger-soner (full-width info) ───
+          - type: custom:mushroom-template-card
+            primary: >
+              {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+              {% set t = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
+              {% set h = states('input_number.vpd_hysteresis') | float(0.02) %}
+              ON > {{ (t+h) | round(2) }} kPa · OFF < {{ (t-h) | round(2) }} kPa
+            secondary: Fogger trigger-soner
+            icon: mdi:water
+            icon_color: cyan
+            card_mod:
+              style: |
+                ha-card { background: rgba(0,229,255,0.08); border-radius: 12px; }
+
+          # ─── ACH (same-type pair → 2-col grid) ───
+          - type: grid
+            columns: 2
+            cards:
+              - type: custom:mushroom-number-card
+                entity: input_number.ach_target_fruiting
+                name: ACH Fruiting
+                icon: mdi:fan-speed-3
+                display_mode: buttons
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(253,121,168,0.12); border-left: 3px solid #FD79A8; border-radius: 12px; }
+              - type: custom:mushroom-number-card
+                entity: input_number.ach_target_pinning
+                name: ACH Pinning
+                icon: mdi:fan-speed-1
+                display_mode: buttons
+                card_mod:
+                  style: |
+                    ha-card { background: rgba(116,185,255,0.12); border-left: 3px solid #74B9FF; border-radius: 12px; }
+
+          # ─── ACH-kalkulator (full-width info) ───
+          - type: custom:mushroom-template-card
+            primary: >
+              {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+              {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
+              {% set half = (((3600 / ach) - 120) / 2) | int %}
+              2×60s ON · gap {{ half }}s · syklus {{ (3600/ach)|int }}s
+            secondary: >
+              {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
+              {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
+              Duty cycle {{ (120 / (3600 / ach) * 100) | round(1) }}% · gap mellom burst: {{ (((3600 / ach) - 120) / 2) | int }}s
+            icon: mdi:fan-clock
+            icon_color: orange
+            card_mod:
+              style: |
+                ha-card { background: rgba(255,107,53,0.10); border-radius: 12px; }
+
+          # ─── Ventilasjonssyklus timer (full-width — viser stor nedtelling) ───
+          - type: entity
+            entity: timer.ventilation_cycle
+            name: Ventilasjonssyklus
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
+
+          # ─── Sensor status (full-width) ───
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.sensor_health_status') }}"
+            secondary: Sensor status
+            icon: mdi:access-point
+            icon_color: >
+              {% if states('sensor.sensor_health_status') == 'All Sensors Online' %}green
+              {% elif 'Fallback' in states('sensor.sensor_health_status') %}orange
+              {% else %}red{% endif %}
+            card_mod:
+              style: |
+                ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
+
+          # ─── Fogger + Vifte (same-type pair → 2-col grid) ───
+          - type: grid
+            columns: 2
+            cards:
               - type: custom:mushroom-entity-card
                 entity: switch.fogger_switch
                 name: Fogger
@@ -554,8 +554,6 @@ views:
                       {% endif %};
                       border-radius: 14px;
                     }
-
-              # VIFTE STATUS
               - type: custom:mushroom-entity-card
                 entity: switch.vifter_switch
                 name: Vifte
