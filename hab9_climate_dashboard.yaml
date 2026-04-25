@@ -30,7 +30,6 @@ views:
                   chart:
                     height: 260
                     background: transparent
-                    type: radialBar
                   theme:
                     mode: dark
                   plotOptions:
@@ -302,7 +301,7 @@ views:
                 transform: "return x === 'on' ? 2.8 : 0.02;"
               - entity: switch.vifter_switch
                 name: Vifte
-                color: '#00B4D8'
+                color: '#FF6B35'
                 yaxis_id: left
                 opacity: 0.70
                 transform: "return x === 'on' ? 1.7 : 0.02;"
@@ -337,12 +336,12 @@ views:
                         fontSize: 9px
                   - y: 1.2
                     y2: 1.7
-                    fillColor: '#00B4D8'
+                    fillColor: '#FF6B35'
                     opacity: 0.05
                     label:
                       text: Vifte
                       style:
-                        color: '#00B4D8'
+                        color: '#FF6B35'
                         fontSize: 9px
             card_mod:
               style: |
@@ -373,7 +372,6 @@ views:
                   chart:
                     background: transparent
                     height: 230
-                    type: radialBar
                   theme:
                     mode: dark
                   plotOptions:
@@ -571,12 +569,12 @@ views:
                 primary: >
                   {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
                   {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
-                  {% set off = ((3600 / ach) - 120) | int %}
-                  Fan 120s ON · {{ off }}s OFF · Syklus {{ (3600/ach)|int }}s
+                  {% set half = (((3600 / ach) - 120) / 2) | int %}
+                  2×60s ON · gap {{ half }}s · syklus {{ (3600/ach)|int }}s
                 secondary: >
                   {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
                   {% set ach = states('input_number.ach_target_pinning' if is_pinning else 'input_number.ach_target_fruiting') | float(7) %}
-                  Duty cycle {{ (120 / (3600 / ach) * 100) | round(1) }}%
+                  Duty cycle {{ (120 / (3600 / ach) * 100) | round(1) }}% · gap mellom burst: {{ (((3600 / ach) - 120) / 2) | int }}s
                 icon: mdi:fan-clock
                 icon_color: orange
                 card_mod:
@@ -590,23 +588,10 @@ views:
             columns: 2
             cards:
               # NESTE FAN-SYKLUS
-              - type: custom:mushroom-template-card
+              # type:entity viser innebygd live-nedtelling for timer-entiteter
+              - type: entity
                 entity: timer.ventilation_cycle
-                primary: >
-                  {% set s = state_attr('timer.ventilation_cycle', 'remaining') %}
-                  {% if is_state('timer.ventilation_cycle', 'active') and s %}
-                    {{ s.split('.')[0] }}
-                  {% elif is_state('timer.fan_on', 'active') %}
-                    Fan kjører nå
-                  {% else %}
-                    Inaktiv
-                  {% endif %}
-                secondary: Neste ventilasjonssyklus
-                icon: mdi:timer-outline
-                icon_color: >
-                  {% if is_state('timer.fan_on', 'active') %}orange
-                  {% elif is_state('timer.ventilation_cycle', 'active') %}cyan
-                  {% else %}grey{% endif %}
+                name: Ventilasjonssyklus
                 card_mod:
                   style: |
                     ha-card { background: rgba(30,30,40,0.85); border-radius: 14px; }
