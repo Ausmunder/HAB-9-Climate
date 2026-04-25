@@ -31,6 +31,8 @@ views:
                   chart:
                     height: 260
                     background: transparent
+                  colors:
+                    - '#00E5FF'
                   theme:
                     mode: dark
                   plotOptions:
@@ -359,6 +361,10 @@ views:
                   chart:
                     background: transparent
                     height: 230
+                  colors:
+                    - '#00E5FF'
+                    - '#69FF47'
+                    - '#FFB347'
                   theme:
                     mode: dark
                   plotOptions:
