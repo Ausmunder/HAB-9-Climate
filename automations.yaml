@@ -1007,22 +1007,25 @@
 - id: fan_watchdog_safety
   alias: 'Fan Watchdog: Safety Shutoff'
   description: >
-    Slår av ventilasjonsviften automatisk hvis den har stått på lengre enn 150s
-    (failsafe - normal on_duration 120s + 30s margin). Restarter også
-    timer.ventilation_cycle slik at ventilasjonssyklusen ikke stopper permanent.
+    Slår av ventilasjonsviften automatisk hvis den har stått på lengre enn 90s
+    (failsafe - normal on_duration 60s + 30s margin). Avbryter alle fan-timere og
+    restarter timer.ventilation_cycle slik at ventilasjonssyklusen ikke stopper permanent.
   trigger:
   - platform: state
     entity_id: switch.vifter_switch
     to: 'on'
     for:
-      seconds: 150
+      seconds: 90
   action:
   - service: switch.turn_off
     target:
       entity_id: switch.vifter_switch
   - service: timer.cancel
     target:
-      entity_id: timer.fan_on
+      entity_id:
+      - timer.fan_on
+      - timer.fan_burst_pause
+      - timer.fan_on_2
   - condition: state
     entity_id: input_boolean.system_enabled
     state: 'on'
@@ -1033,13 +1036,13 @@
       duration: >
         {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
         {% set ach = states(ach_entity) | float(7) %}
-        {% set off_sec = ((3600 / ach) - 120) | int %}
-        {{ [off_sec, 30] | max }}
+        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
+        {{ [half_sec, 15] | max }}
   - service: notify.mobile_app_pixel_9a
     data:
       title: '⚠️ Fan Watchdog aktivert'
       message: >
-        Viften var ON i >150s. Tvunget OFF + timer restartet kl {{ now().strftime('%H:%M') }}.
+        Viften var ON i >90s. Tvunget OFF + timer restartet kl {{ now().strftime('%H:%M') }}.
       data:
         priority: high
         channel: VPD_Alerts
@@ -1079,10 +1082,10 @@
         channel: VPD_Alerts
   mode: single
 - id: ventilation_cycle_end
-  alias: 'Ventilation: Cycle End → Fan On'
+  alias: 'Ventilation: Cycle End → Fan On (Burst 1)'
   description: >
-    timer.ventilation_cycle utløper → fan ON + start fan_on timer (120s).
-    Ingen delay — all timing via timere. Erstatter delay-basert ventilation_timer_v4.
+    timer.ventilation_cycle utløper → fan ON + start timer.fan_on (60s, burst 1).
+    ACH-syklusen består av 2×60s med jevnt fordelt pause mellom. Ingen delay.
   trigger:
   - platform: event
     event_type: timer.finished
@@ -1100,13 +1103,14 @@
     target:
       entity_id: timer.fan_on
     data:
-      duration: "00:02:00"
+      duration: "00:01:00"
   mode: single
 - id: fan_on_timer_end
-  alias: 'Ventilation: Fan On Timer End → Fan Off'
+  alias: 'Ventilation: Fan On Timer End (Burst 1) → Pause'
   description: >
-    timer.fan_on utløper → slå av fan (alltid, uansett system state), deretter
-    restart timer.ventilation_cycle hvis system_enabled=on. Ingen delay.
+    timer.fan_on (60s, burst 1) utløper → slå av fan, deretter start
+    timer.fan_burst_pause med halv off-tid = (3600/ACH - 120) / 2 sekunder.
+    fan_burst_pause_end tar over og starter burst 2.
   trigger:
   - platform: event
     event_type: timer.finished
@@ -1121,13 +1125,81 @@
     state: 'on'
   - service: timer.start
     target:
+      entity_id: timer.fan_burst_pause
+    data:
+      duration: >
+        {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
+        {% set ach = states(ach_entity) | float(7) %}
+        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
+        {{ [half_sec, 15] | max }}
+  mode: single
+- id: fan_burst_pause_end
+  alias: 'Ventilation: Burst Pause End → Fan On (Burst 2)'
+  description: >
+    timer.fan_burst_pause utløper → fan ON (burst 2) + start timer.fan_on_2 (60s).
+    Kun aktiv hvis system er på.
+  trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.fan_burst_pause
+  condition:
+  - condition: state
+    entity_id: input_boolean.system_enabled
+    state: 'on'
+  action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.vifter_switch
+  - service: timer.start
+    target:
+      entity_id: timer.fan_on_2
+    data:
+      duration: "00:01:00"
+  mode: single
+- id: fan_on_2_timer_end
+  alias: 'Ventilation: Fan On Timer End (Burst 2) → Cycle Restart'
+  description: >
+    timer.fan_on_2 (60s, burst 2) utløper → slå av fan (alltid), deretter
+    restart timer.ventilation_cycle med halv off-tid = (3600/ACH - 120) / 2 sekunder.
+    Komplett ACH-syklus: ventilation_cycle → burst1 → pause → burst2 → ventilation_cycle.
+  trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.fan_on_2
+  action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.vifter_switch
+  - condition: state
+    entity_id: input_boolean.system_enabled
+    state: 'on'
+  - service: timer.start
+    target:
       entity_id: timer.ventilation_cycle
     data:
       duration: >
         {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
         {% set ach = states(ach_entity) | float(7) %}
-        {% set off_sec = ((3600 / ach) - 120) | int %}
-        {{ [off_sec, 30] | max }}
+        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
+        {{ [half_sec, 15] | max }}
+  mode: single
+- id: fogger_burst_cap
+  alias: 'Fogger: Burst Cap (14s)'
+  description: >
+    timer.fogger_burst (14s) utløper → fogger OFF. Begrenser hvert fogger-puls til 14s
+    slik at damp rekker å blande seg med luft uten å saturere. fogger_control_loop
+    re-evaluerer ved neste 30s poll og starter ny burst hvis VPD fortsatt er høy.
+  trigger:
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: timer.fogger_burst
+  action:
+  - service: switch.turn_off
+    target:
+      entity_id: switch.fogger_switch
   mode: single
 - id: fogger_control_loop
   alias: 'Fogger: Control Loop'
@@ -1163,6 +1235,11 @@
       - service: switch.turn_on
         target:
           entity_id: switch.fogger_switch
+      - service: timer.start
+        target:
+          entity_id: timer.fogger_burst
+        data:
+          duration: "00:00:14"
     - conditions:
       - condition: template
         value_template: "{{ vpd < (target_vpd - hyst) }}"
@@ -1176,7 +1253,8 @@
   alias: 'ACH: Sync Cycle Timer on Change'
   description: >
     Trigger på begge ACH-entiteter. Condition filtrerer at kun aktiv fase er relevant.
-    Fan ON-tid er fast 120s (hardkodet). Erstatter ach_sync_pinning + ach_sync_fruiting.
+    Avbryter pågående burst-sekvens og restarter ventilation_cycle med ny half_sec
+    = (3600/ACH - 120) / 2. Fan ON er 2×60s hardkodet.
   trigger:
   - trigger: state
     entity_id:
@@ -1192,14 +1270,23 @@
       {{ (is_pinning and trigger.entity_id == 'input_number.ach_target_pinning')
          or (not is_pinning and trigger.entity_id == 'input_number.ach_target_fruiting') }}
   action:
+  - service: timer.cancel
+    target:
+      entity_id:
+      - timer.fan_on
+      - timer.fan_burst_pause
+      - timer.fan_on_2
+  - service: switch.turn_off
+    target:
+      entity_id: switch.vifter_switch
   - service: timer.start
     target:
       entity_id: timer.ventilation_cycle
     data:
       duration: >
         {% set ach = trigger.to_state.state | float(7) %}
-        {% set off_sec = ((3600 / ach) - 120) | int %}
-        {{ [off_sec, 30] | max }}
+        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
+        {{ [half_sec, 15] | max }}
   mode: single
 - id: system_startup
   alias: 'System: Safe Startup'
@@ -1224,6 +1311,8 @@
       entity_id:
       - timer.ventilation_cycle
       - timer.fan_on
+      - timer.fan_burst_pause
+      - timer.fan_on_2
   - delay:
       seconds: 60
   - choose:
@@ -1291,6 +1380,8 @@
       entity_id:
       - timer.ventilation_cycle
       - timer.fan_on
+      - timer.fan_burst_pause
+      - timer.fan_on_2
   - service: switch.turn_off
     target:
       entity_id:

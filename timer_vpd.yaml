@@ -5,9 +5,24 @@ ventilation_cycle:
   restore: true
 
 fan_on:
-  name: Fan ON Timer
+  name: Fan ON Timer (Burst 1)
   icon: mdi:fan-clock
   restore: true
+
+fan_burst_pause:
+  name: Fan Burst Pause Timer
+  icon: mdi:fan-clock
+  restore: true
+
+fan_on_2:
+  name: Fan ON Timer (Burst 2)
+  icon: mdi:fan-clock
+  restore: true
+
+fogger_burst:
+  name: Fogger Burst Cap Timer
+  icon: mdi:timer-stop
+  restore: false
 
 pinning_phase_countdown:
   name: Pinning Phase Auto-Return
