@@ -1291,9 +1291,11 @@
 - id: system_startup
   alias: 'System: Safe Startup'
   description: >
-    HA-restart: hardware OFF, system_enabled=false, vent 60s, sjekk sensorer.
-    Sensorer OK → system_enabled=true (trigger system_start). Offline → notify.
-    Erstatter safety_fan_off_on_ha_start + startup_sensor_availability_check.
+    HA-restart: hardware OFF, system_enabled=false, vent 60s.
+    Starter ALLTID system_enabled=true etter delay (trigger system_start).
+    Hvis sensorer fortsatt offline → varsle men blokker ikke start.
+    Fogger styres kun når VPD er tilgjengelig (fogger_control_loop condition),
+    vifte sykler normalt uansett sensortilstand.
   trigger:
   - platform: homeassistant
     event: start
@@ -1315,30 +1317,27 @@
       - timer.fan_on_2
   - delay:
       seconds: 60
+  - service: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.system_enabled
   - choose:
     - conditions:
       - condition: template
         value_template: >
-          {{ states('sensor.chamber_sensor_1_temperature') not in ['unavailable', 'unknown']
-             and states('sensor.chamber_sensor_1_humidity') not in ['unavailable', 'unknown']
-             and states('sensor.chamber_sensor_2_temperature') not in ['unavailable', 'unknown']
-             and states('sensor.chamber_sensor_2_humidity') not in ['unavailable', 'unknown'] }}
+          {{ states('sensor.chamber_sensor_1_temperature') in ['unavailable', 'unknown']
+             or states('sensor.chamber_sensor_2_temperature') in ['unavailable', 'unknown'] }}
       sequence:
-      - service: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.system_enabled
-    default:
-    - service: notify.mobile_app_pixel_9a
-      data:
-        title: '🚫 VPD System blokkert ved oppstart'
-        message: >
-          Sensorer offline etter omstart.
-          S1: {{ states('sensor.chamber_sensor_1_temperature') }}/{{ states('sensor.chamber_sensor_1_humidity') }},
-          S2: {{ states('sensor.chamber_sensor_2_temperature') }}/{{ states('sensor.chamber_sensor_2_humidity') }}.
-          VPD-systemet er IKKE startet. Sjekk ZHA og sensorene.
+      - service: notify.mobile_app_pixel_9a
         data:
-          priority: high
-          channel: VPD_Alerts
+          title: '⚠️ HAB-9 startet — sensorer offline'
+          message: >
+            System startet automatisk etter restart.
+            S1: {{ states('sensor.chamber_sensor_1_temperature') }}/{{ states('sensor.chamber_sensor_1_humidity') }},
+            S2: {{ states('sensor.chamber_sensor_2_temperature') }}/{{ states('sensor.chamber_sensor_2_humidity') }}.
+            Vifte sykler normalt. Fogger venter til VPD er tilgjengelig.
+          data:
+            priority: high
+            channel: VPD_Alerts
   mode: single
 - id: system_start
   alias: 'System: Start (system_enabled → on)'
