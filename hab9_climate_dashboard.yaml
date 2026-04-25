@@ -7,14 +7,16 @@ views:
   - title: Climate
     path: climate
     icon: mdi:mushroom
-    type: panel
-    cards:
-      - type: vertical-stack
-        cards:
+    type: sections
+    max_columns: 3
+    sections:
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 1 — Hero: VPD gauge + Temp/RH + Toggle
-          # ─────────────────────────────────────────────
+      # ═══════════════════════════════════════════
+      # KOLONNE 1 — Klimastatus
+      # ═══════════════════════════════════════════
+      - cards:
+
+          # ─── Hero: VPD gauge + Temp/RH + Toggle ───
           - type: horizontal-stack
             cards:
               # VPD GAUGE — innebygd HA gauge (needle + fargesoner)
@@ -93,9 +95,7 @@ views:
                         }
                         .primary { font-size: 28px !important; font-weight: 700 !important; color: #69FF47 !important; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 2 — Live trend: VPD + Humidity (6h)
-          # ─────────────────────────────────────────────
+          # ─── VPD & Fuktighet — 6 timer ───
           - type: custom:apexcharts-card
             graph_span: 6h
             update_interval: 30s
@@ -172,9 +172,12 @@ views:
               style: |
                 ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 3 — Temperatur (12h)
-          # ─────────────────────────────────────────────
+      # ═══════════════════════════════════════════
+      # KOLONNE 2 — Trender
+      # ═══════════════════════════════════════════
+      - cards:
+
+          # ─── Temperatur — 12 timer ───
           - type: custom:apexcharts-card
             graph_span: 12h
             update_interval: 5min
@@ -238,9 +241,7 @@ views:
               style: |
                 ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 4 — Aktivitetsheatmap (Fogger + Vifte, 3h)
-          # ─────────────────────────────────────────────
+          # ─── Fogger & Vifte aktivitet — 3 timer ───
           - type: custom:apexcharts-card
             graph_span: 3h
             update_interval: 15s
@@ -314,9 +315,7 @@ views:
               style: |
                 ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 5 — Climate Health 3t (3 stat-kort)
-          # ─────────────────────────────────────────────
+          # ─── Climate Health 3t (3 stat-kort) ───
           - type: grid
             columns: 3
             cards:
@@ -368,9 +367,12 @@ views:
                     }
                     .primary { font-size: 32px !important; font-weight: 700 !important; color: #FFB347 !important; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 6 — Kontrollpanel
-          # ─────────────────────────────────────────────
+      # ═══════════════════════════════════════════
+      # KOLONNE 3 — Kontroll
+      # ═══════════════════════════════════════════
+      - cards:
+
+          # ─── Kontrollpanel ───
           - type: vertical-stack
             cards:
               # HEADER med fase-status
@@ -510,14 +512,11 @@ views:
                   style: |
                     ha-card { background: rgba(255,107,53,0.10); border-radius: 12px; }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 7 — Diagnostics
-          # ─────────────────────────────────────────────
+          # ─── Diagnostics ───
           - type: grid
             columns: 2
             cards:
-              # NESTE FAN-SYKLUS
-              # type:entity viser innebygd live-nedtelling for timer-entiteter
+              # NESTE FAN-SYKLUS — type:entity viser innebygd live-nedtelling
               - type: entity
                 entity: timer.ventilation_cycle
                 name: Ventilasjonssyklus
@@ -549,7 +548,7 @@ views:
                   style: |
                     ha-card {
                       background: {% if is_state('switch.fogger_switch', 'on') %}
-                        rgba(105,255,71,0.20)
+                        rgba(0,180,216,0.20)
                       {% else %}
                         rgba(30,30,40,0.85)
                       {% endif %};
@@ -567,16 +566,14 @@ views:
                   style: |
                     ha-card {
                       background: {% if is_state('switch.vifter_switch', 'on') %}
-                        rgba(0,180,216,0.20)
+                        rgba(105,255,71,0.20)
                       {% else %}
                         rgba(30,30,40,0.85)
                       {% endif %};
                       border-radius: 14px;
                     }
 
-          # ─────────────────────────────────────────────
-          # SEKSJON 8 — Inkubasjon (12h)
-          # ─────────────────────────────────────────────
+          # ─── Inkubasjon — 12 timer ───
           - type: custom:apexcharts-card
             graph_span: 12h
             update_interval: 5min
