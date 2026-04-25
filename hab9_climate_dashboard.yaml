@@ -23,6 +23,7 @@ views:
                 series:
                   - entity: sensor.chamber_current_vpd
                     name: VPD
+                    color: '#00E5FF'
                     max: 0.35
                 header:
                   show: false
@@ -37,9 +38,8 @@ views:
                       startAngle: -135
                       endAngle: 135
                       track:
-                        background: '#1a1a2e'
-                        strokeWidth: 90%
-                        margin: 4
+                        background: 'rgba(255,255,255,0.10)'
+                        strokeWidth: 97%
                       hollow:
                         size: 55%
                       dataLabels:
@@ -51,19 +51,6 @@ views:
                           fontWeight: 700
                           color: '#00E5FF'
                           formatter: "function(val) { return (val/100*0.35).toFixed(2)+' kPa'; }"
-                  fill:
-                    type: gradient
-                    gradient:
-                      colorStops:
-                        - offset: 0
-                          color: '#4CAF50'
-                          opacity: 1
-                        - offset: 45
-                          color: '#FFEB3B'
-                          opacity: 1
-                        - offset: 100
-                          color: '#F44336'
-                          opacity: 1
                   grid:
                     show: false
                 card_mod:
@@ -295,13 +282,13 @@ views:
             series:
               - entity: switch.fogger_switch
                 name: Fogger
-                color: '#69FF47'
+                color: '#00B4D8'
                 yaxis_id: left
                 opacity: 0.85
                 transform: "return x === 'on' ? 2.8 : 0.02;"
               - entity: switch.vifter_switch
                 name: Vifte
-                color: '#FF6B35'
+                color: '#69FF47'
                 yaxis_id: left
                 opacity: 0.70
                 transform: "return x === 'on' ? 1.7 : 0.02;"
@@ -327,21 +314,21 @@ views:
                 yaxis:
                   - y: 2.3
                     y2: 2.8
-                    fillColor: '#69FF47'
+                    fillColor: '#00B4D8'
                     opacity: 0.05
                     label:
                       text: Fogger
                       style:
-                        color: '#69FF47'
+                        color: '#00B4D8'
                         fontSize: 9px
                   - y: 1.2
                     y2: 1.7
-                    fillColor: '#FF6B35'
+                    fillColor: '#69FF47'
                     opacity: 0.05
                     label:
                       text: Vifte
                       style:
-                        color: '#FF6B35'
+                        color: '#69FF47'
                         fontSize: 9px
             card_mod:
               style: |
@@ -379,7 +366,7 @@ views:
                       hollow:
                         size: 25%
                       track:
-                        background: '#1a1a2e'
+                        background: 'rgba(255,255,255,0.10)'
                       dataLabels:
                         name:
                           fontSize: '10px'
@@ -393,12 +380,7 @@ views:
                           fontSize: '11px'
                           fontWeight: 700
                           color: '#ffffff'
-                          formatter: >
-                            function(w) {
-                              const v = w.globals.series;
-                              const avg = v.reduce((a,b)=>a+b,0)/v.length;
-                              return Math.round(avg)+'%';
-                            }
+                          formatter: "function(w) { var v=w.globals.series; return Math.round(v.reduce(function(a,b){return a+b},0)/v.length)+'%'; }"
                 card_mod:
                   style: |
                     ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
