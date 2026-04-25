@@ -17,47 +17,25 @@ views:
           # ─────────────────────────────────────────────
           - type: horizontal-stack
             cards:
-              # VPD GAUGE
-              - type: custom:apexcharts-card
-                chart_type: radialBar
-                series:
-                  - entity: sensor.chamber_current_vpd
-                    name: VPD
-                    color: '#00E5FF'
-                    max: 0.35
-                header:
-                  show: false
-                apex_config:
-                  chart:
-                    height: 260
-                    background: transparent
-                  colors:
-                    - '#00E5FF'
-                  theme:
-                    mode: dark
-                  plotOptions:
-                    radialBar:
-                      startAngle: -135
-                      endAngle: 135
-                      track:
-                        background: 'rgba(255,255,255,0.10)'
-                        strokeWidth: 97%
-                      hollow:
-                        size: 55%
-                      dataLabels:
-                        name:
-                          show: false
-                        value:
-                          offsetY: 8
-                          fontSize: '36px'
-                          fontWeight: 700
-                          color: '#00E5FF'
-                          formatter: "function(val) { return (val/100*0.35).toFixed(2)+' kPa'; }"
-                  grid:
-                    show: false
+              # VPD GAUGE — innebygd HA gauge (needle + fargesoner)
+              - type: gauge
+                entity: sensor.chamber_current_vpd
+                name: VPD
+                unit: kPa
+                min: 0
+                max: 0.35
+                needle: true
+                severity:
+                  green: 0
+                  yellow: 0.14
+                  red: 0.22
                 card_mod:
                   style: |
-                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
+                    ha-card {
+                      background: rgba(30,30,40,0.85);
+                      border-radius: 18px;
+                      --gauge-color: #00E5FF;
+                    }
 
               # TEMP + RH + SYSTEM TOGGLE
               - type: vertical-stack
@@ -337,95 +315,58 @@ views:
                 ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
 
           # ─────────────────────────────────────────────
-          # SEKSJON 5 — Climate Health 3t
+          # SEKSJON 5 — Climate Health 3t (3 stat-kort)
           # ─────────────────────────────────────────────
-          - type: horizontal-stack
+          - type: grid
+            columns: 3
             cards:
-              # TRE RINGER
-              - type: custom:apexcharts-card
-                chart_type: radialBar
-                series:
-                  - entity: sensor.vpd_accuracy_3h
-                    name: VPD presisjon
-                    color: '#00E5FF'
-                    max: 100
-                  - entity: sensor.rh_stability_score
-                    name: RH stabilitet
-                    color: '#69FF47'
-                    max: 100
-                  - entity: sensor.system_uptime_3h
-                    name: Systemoppetid
-                    color: '#FFB347'
-                    max: 100
-                apex_config:
-                  chart:
-                    background: transparent
-                    height: 230
-                  colors:
-                    - '#00E5FF'
-                    - '#69FF47'
-                    - '#FFB347'
-                  theme:
-                    mode: dark
-                  plotOptions:
-                    radialBar:
-                      hollow:
-                        size: 25%
-                      track:
-                        background: 'rgba(255,255,255,0.10)'
-                      dataLabels:
-                        name:
-                          fontSize: '10px'
-                        value:
-                          fontSize: '13px'
-                          fontWeight: 600
-                          formatter: "function(val) { return Math.round(val)+'%'; }"
-                        total:
-                          show: true
-                          label: 'Climate Health'
-                          fontSize: '11px'
-                          fontWeight: 700
-                          color: '#ffffff'
-                          formatter: "function(w) { var v=w.globals.series; return Math.round(v.reduce(function(a,b){return a+b},0)/v.length)+'%'; }"
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states('sensor.vpd_accuracy_3h') | float(0) | round(0) }}%
+                secondary: VPD presisjon (3t)
+                icon: mdi:crosshairs-gps
+                icon_color: >
+                  {% set v = states('sensor.vpd_accuracy_3h') | float(0) %}
+                  {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
                 card_mod:
                   style: |
-                    ha-card { background: rgba(30,30,40,0.85); border-radius: 18px; }
-
-              # NUMERISKE VERDIER
-              - type: vertical-stack
-                cards:
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {{ states('sensor.vpd_accuracy_3h') | float(0) | round(0) }}%
-                    secondary: VPD innenfor target siste 3t
-                    icon: mdi:crosshairs-gps
-                    icon_color: >
-                      {% set v = states('sensor.vpd_accuracy_3h') | float(0) %}
-                      {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(0,229,255,0.08); border-radius: 14px; margin-bottom: 8px; }
-                  - type: custom:mushroom-template-card
-                    primary: "{{ states('sensor.rh_stability_score') }}%"
-                    secondary: RH stabilitet (std.dev 3t)
-                    icon: mdi:wave
-                    icon_color: >
-                      {% set v = states('sensor.rh_stability_score') | int(0) %}
-                      {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(105,255,71,0.08); border-radius: 14px; margin-bottom: 8px; }
-                  - type: custom:mushroom-template-card
-                    primary: >
-                      {{ states('sensor.system_uptime_3h') | float(0) | round(0) }}%
-                    secondary: System aktiv siste 3t
-                    icon: mdi:power
-                    icon_color: >
-                      {% set v = states('sensor.system_uptime_3h') | float(0) %}
-                      {% if v > 95 %}green{% elif v > 80 %}orange{% else %}red{% endif %}
-                    card_mod:
-                      style: |
-                        ha-card { background: rgba(255,179,71,0.08); border-radius: 14px; }
+                    ha-card {
+                      background: rgba(0,229,255,0.10);
+                      border-top: 3px solid #00E5FF;
+                      border-radius: 14px;
+                    }
+                    .primary { font-size: 32px !important; font-weight: 700 !important; color: #00E5FF !important; }
+              - type: custom:mushroom-template-card
+                primary: "{{ states('sensor.rh_stability_score') | int(0) }}%"
+                secondary: RH stabilitet (3t)
+                icon: mdi:wave
+                icon_color: >
+                  {% set v = states('sensor.rh_stability_score') | int(0) %}
+                  {% if v > 80 %}green{% elif v > 60 %}orange{% else %}red{% endif %}
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: rgba(105,255,71,0.10);
+                      border-top: 3px solid #69FF47;
+                      border-radius: 14px;
+                    }
+                    .primary { font-size: 32px !important; font-weight: 700 !important; color: #69FF47 !important; }
+              - type: custom:mushroom-template-card
+                primary: >
+                  {{ states('sensor.system_uptime_3h') | float(0) | round(0) }}%
+                secondary: Systemoppetid (3t)
+                icon: mdi:power
+                icon_color: >
+                  {% set v = states('sensor.system_uptime_3h') | float(0) %}
+                  {% if v > 95 %}green{% elif v > 80 %}orange{% else %}red{% endif %}
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: rgba(255,179,71,0.10);
+                      border-top: 3px solid #FFB347;
+                      border-radius: 14px;
+                    }
+                    .primary { font-size: 32px !important; font-weight: 700 !important; color: #FFB347 !important; }
 
           # ─────────────────────────────────────────────
           # SEKSJON 6 — Kontrollpanel
