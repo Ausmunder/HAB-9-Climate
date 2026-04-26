@@ -1051,16 +1051,15 @@
   alias: 'Ventilation: Timer Idle Watchdog (Lag 3)'
   description: >
     Evighetsmaskin-recovery: restarter timer.ventilation_cycle hvis den har vært idle
-    i 30 minutter mens system_enabled er ON. Normal idle-tid er ~120s (fan ON-periode),
-    så 30 min er 14× normalverdi — aldri falske positiver. Timer settes til 30s slik at
-    ventilation_cycle_end tar over og kjører normal fan-syklus. Sikrer at ventilasjon
-    aldri stopper permanent uansett intern HA-feil.
+    i 10 minutter mens system_enabled er ON. Normal maks idle-tid er 317s (~5.3 min:
+    fan_on 60s + fan_burst_pause 197s + fan_on_2 60s), så 10 min er 1.9× normalverdi
+    — aldri falske positiver, men fanger svikt 3× raskere enn tidligere terskel på 30 min.
   trigger:
   - platform: state
     entity_id: timer.ventilation_cycle
     to: idle
     for:
-      minutes: 30
+      minutes: 10
   condition:
   - condition: state
     entity_id: input_boolean.system_enabled
