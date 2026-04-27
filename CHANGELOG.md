@@ -4,6 +4,72 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [2.0.0] - 2026-04-27
+
+### Breaking Changes — VPD-first + Safety Overrides + Power Verification
+
+Komplett redesign av fogger- og ventilasjonskontroll. Polling-basert logikk erstattet med event-drevet arkitektur. Eksplisitt kontrollhierarki innført.
+
+#### Kontrollhierarki
+```
+Prioritet 1 — Safety   →  overstyrer alt
+Prioritet 2 — VPD      →  primær kontroll (event-drevet)
+Prioritet 3 — ACH      →  sekundær, uavhengig syklus
+```
+
+#### Nye filer
+- **fogger.yaml** — All fogger-logikk i én fil (6 automasjoner)
+- **ventilation.yaml** — All ventilasjon i én fil (ÉN sekvens-automation + watchdogs)
+- **power_safety.yaml** — Power-verifisering for vifte og fogger
+
+#### Fjernet
+- `fogger_control_loop` (polling hvert 30s) → erstattet av event-trigger på VPD-endring
+- `fogger_burst_cap` → innebygget i `fogger_burst_end`
+- `fogger_watchdog_safety` (10 min) → ny watchdog med 3 min terskel
+- `ventilation_cycle_end`, `fan_on_timer_end`, `fan_burst_pause_end`, `fan_on_2_timer_end` → erstattet av én sekvens-automation
+- `ach_sync` (gammel) → ny versjon i ventilation.yaml
+- `fan_watchdog_safety` (gammel) → ny versjon i ventilation.yaml
+- `ventilation_timer_idle_watchdog` (gammel) → ny versjon i ventilation.yaml
+- `Chamber Maximum RH Safety` → erstattet av `fogger_rh_hard_cutoff` (ingen system_enabled-avhengighet)
+- `timer.fan_on`, `timer.fan_on_2`, `timer.fan_burst_pause`
+- `sensor.rh_control_lower_limit`, `sensor.rh_control_upper_limit`
+- `sensor.rh_target_pinning_phase`, `sensor.rh_target_fruiting_phase`
+
+#### Nye helpers
+- `input_boolean.fogger_lockout` — Safety lockout ved power-feil
+- `input_boolean.fogger_blocked_by_fan` — Anti-oscillasjon (30s blokkering)
+- `input_number.fogger_burst_duration` (default 14s, konfigurerbar)
+- `input_number.fan_total_on_time` (default 120s, konfigurerbar)
+- `input_number.fan_power_min/max`, `fogger_power_min/max` — Power-grenser
+- `input_number.power_check_delay`, `fogger_lockout_time` — Lockout-konfigurasjon
+- `timer.fogger_lockout_timer` — Lockout-timer
+
+#### Fogger-forbedringer
+- **Event-drevet:** Trigges på VPD state change, ikke polling. Kortere reaksjonstid.
+- **Anti-oscillasjon:** Fogger blokkert 30s etter viftestart (`fogger_blocked_by_fan`)
+- **Adaptiv retrigger:** Etter burst, re-evaluer umiddelbart hvis VPD > target + 0.05 kPa
+- **Watchdog forkortet:** 10 min → 3 min
+- **Burst konfigurerbar:** `input_number.fogger_burst_duration` (default 14s)
+- **Lockout:** Power-feil aktiverer lockout i konfigurerbar tid (`fogger_lockout_time`)
+
+#### Ventilasjon-forenkling
+- 4 timer-automasjoner → 1 sekvens-automation med inline delay
+- Syklusberegning: `pause = (3600/ACH - fan_total_on_time) / 2`
+- `fan_total_on_time` er nå konfigurerbar (var hardkodet 120s)
+
+#### Power verification (ny)
+- Fan og fogger verifiserer strømforbruk etter oppstart
+- Underpower → OFF (fogger: lockout aktiveres)
+- Overpower → OFF + varsling
+- Alle grenser konfigurerbare via input_number
+
+#### Breaking changes for dashboard
+- `timer.fan_on`, `timer.fan_on_2`, `timer.fan_burst_pause` er slettet
+- `sensor.rh_control_lower_limit`, `sensor.rh_control_upper_limit` er slettet
+- Eventuelle dashboard-referanser til disse må oppdateres
+
+---
+
 ## [1.0.0] - 2026-04-24
 
 ### Breaking Changes — HAB-9 Architecture Refactor

@@ -137,66 +137,11 @@ template:
              states('sensor.chamber_avg_humidity') not in ['unavailable', 'unknown', 'none'] }}
 
       # ─────────────────────────────────────────────────────────────────────────
-      # VPD CONTROL SYSTEM SENSORS (v2.0 - Dynamisk)
+      # VPD CONTROL SYSTEM SENSORS
       # ─────────────────────────────────────────────────────────────────────────
-
-      # RH lower/upper limits basert på VPD hysteresis
-      - name: "RH Control Lower Limit"
-        unique_id: rh_control_lower_limit
-        unit_of_measurement: "%"
-        state: >
-          {% set temp = states('sensor.chamber_avg_temp') | float(18) %}
-          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.10) if is_pinning
-                              else states('input_number.target_vpd_fruiting') | float(0.12) %}
-          {% set vpd_hyst = states('input_number.vpd_hysteresis') | float(0.03) %}
-
-          {# Lower VPD = higher RH #}
-          {% set lower_vpd = target_vpd - vpd_hyst %}
-          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
-          {% set target_vp = svp - lower_vpd %}
-          {% set rh = (target_vp / svp) * 100 %}
-
-          {{ rh | round(1) }}
-
-      - name: "RH Control Upper Limit"
-        unique_id: rh_control_upper_limit
-        unit_of_measurement: "%"
-        state: >
-          {% set temp = states('sensor.chamber_avg_temp') | float(18) %}
-          {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.10) if is_pinning
-                              else states('input_number.target_vpd_fruiting') | float(0.12) %}
-          {% set vpd_hyst = states('input_number.vpd_hysteresis') | float(0.03) %}
-
-          {# Higher VPD = lower RH #}
-          {% set upper_vpd = target_vpd + vpd_hyst %}
-          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
-          {% set target_vp = svp - upper_vpd %}
-          {% set rh = (target_vp / svp) * 100 %}
-
-          {{ rh | round(1) }}
-
-      # RH target per fase (fast temperatur 15°C/17°C, oppdateres ved VPD-target-endring)
-      - name: "RH Target Pinning Phase"
-        unique_id: rh_target_pinning_phase
-        unit_of_measurement: "%"
-        icon: mdi:water-percent
-        state: >
-          {% set temp = 15.0 %}
-          {% set target_vpd = states('input_number.target_vpd_pinning') | float(0.10) %}
-          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
-          {{ (((svp - target_vpd) / svp) * 100) | round(1) }}
-
-      - name: "RH Target Fruiting Phase"
-        unique_id: rh_target_fruiting_phase
-        unit_of_measurement: "%"
-        icon: mdi:water-percent
-        state: >
-          {% set temp = 17.0 %}
-          {% set target_vpd = states('input_number.target_vpd_fruiting') | float(0.12) %}
-          {% set svp = 0.61078 * (2.71828 ** ((17.27 * temp) / (temp + 237.3))) %}
-          {{ (((svp - target_vpd) / svp) * 100) | round(1) }}
+      # rh_control_lower_limit, rh_control_upper_limit,
+      # rh_target_pinning_phase, rh_target_fruiting_phase fjernet —
+      # kontroll er nå VPD-only (ingen RH-baserte grenser i loop).
 
       # Status sensors
       - name: "Ventilation Status"

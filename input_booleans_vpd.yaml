@@ -11,3 +11,15 @@ pinning_phase:
   name: Pinning Phase
   icon: mdi:sprout
   initial: false
+
+# Fogger safety lockout (aktiveres ved power-feil)
+fogger_lockout:
+  name: Fogger Lockout
+  icon: mdi:lock
+  initial: false
+
+# Blokkerer fogger i 30s etter viftestart (anti-oscillasjon)
+fogger_blocked_by_fan:
+  name: Fogger Blocked by Fan
+  icon: mdi:fan-alert
+  initial: false

@@ -1,27 +1,18 @@
-# VPD Control System - Timer
+# VPD Control System - Timers
+
 ventilation_cycle:
   name: Ventilation Cycle Timer
   icon: mdi:timer-outline
   restore: true
 
-fan_on:
-  name: Fan ON Timer (Burst 1)
-  icon: mdi:fan-clock
-  restore: true
-
-fan_burst_pause:
-  name: Fan Burst Pause Timer
-  icon: mdi:fan-clock
-  restore: true
-
-fan_on_2:
-  name: Fan ON Timer (Burst 2)
-  icon: mdi:fan-clock
-  restore: true
-
 fogger_burst:
   name: Fogger Burst Cap Timer
   icon: mdi:timer-stop
+  restore: false
+
+fogger_lockout_timer:
+  name: Fogger Lockout Timer
+  icon: mdi:lock-clock
   restore: false
 
 pinning_phase_countdown:

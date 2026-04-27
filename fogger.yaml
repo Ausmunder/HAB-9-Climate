@@ -1,0 +1,197 @@
+# Fogger Control — VPD-first med safety overrides
+#
+# Kontrollhierarki:
+#   Prioritet 1 — Safety (RH > 98%, power-feil, lockout)  →  overstyrer alt
+#   Prioritet 2 — VPD (primær kontroll, event-drevet)
+
+# ─── 2.1 VPD-trigger fogger control ──────────────────────────────────────────
+# Erstatter polling-basert fogger_control_loop.
+# Trigges på hver VPD-endring — ingen 30s forsinkelse.
+- id: fogger_vpd_control
+  alias: "Fogger — VPD control (event-drevet)"
+  trigger:
+    - platform: state
+      entity_id: sensor.chamber_current_vpd
+  condition:
+    - condition: state
+      entity_id: input_boolean.system_enabled
+      state: "on"
+    - condition: not
+      conditions:
+        - condition: state
+          entity_id: sensor.chamber_current_vpd
+          state: "unavailable"
+        - condition: state
+          entity_id: sensor.chamber_current_vpd
+          state: "unknown"
+    # Safety: fogger_lockout
+    - condition: state
+      entity_id: input_boolean.fogger_lockout
+      state: "off"
+    # Safety: anti-oscillasjon
+    - condition: state
+      entity_id: input_boolean.fogger_blocked_by_fan
+      state: "off"
+    # Safety: RH hard cutoff
+    - condition: template
+      value_template: >
+        {{ states('sensor.chamber_avg_humidity') | float(0) < 98 }}
+  action:
+    - choose:
+        # VPD for høy → fogger ON + start burst timer
+        - conditions:
+            - condition: template
+              value_template: >
+                {% set vpd = states('sensor.chamber_current_vpd') | float(0) %}
+                {% set phase = states('input_boolean.pinning_phase') %}
+                {% set target = states('input_number.target_vpd_pinning') | float(0.10) if phase == 'on' else states('input_number.target_vpd_fruiting') | float(0.12) %}
+                {% set hyst = states('input_number.vpd_hysteresis') | float(0.01) %}
+                {{ vpd > (target + hyst) }}
+          sequence:
+            - service: switch.turn_on
+              target:
+                entity_id: switch.fogger_switch
+            - service: timer.start
+              target:
+                entity_id: timer.fogger_burst
+              data:
+                duration: "{{ states('input_number.fogger_burst_duration') | int(14) }}"
+        # VPD for lav → fogger OFF
+        - conditions:
+            - condition: template
+              value_template: >
+                {% set vpd = states('sensor.chamber_current_vpd') | float(0) %}
+                {% set phase = states('input_boolean.pinning_phase') %}
+                {% set target = states('input_number.target_vpd_pinning') | float(0.10) if phase == 'on' else states('input_number.target_vpd_fruiting') | float(0.12) %}
+                {% set hyst = states('input_number.vpd_hysteresis') | float(0.01) %}
+                {{ vpd < (target - hyst) }}
+          sequence:
+            - service: switch.turn_off
+              target:
+                entity_id: switch.fogger_switch
+  mode: single
+  max_exceeded: silent
+
+# ─── 2.2 Fogger burst auto-off ───────────────────────────────────────────────
+- id: fogger_burst_end
+  alias: "Fogger — Burst auto-off"
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.fogger_burst
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+  mode: single
+
+# ─── 2.3 Anti-oscillasjon — blokkér fogger 30s etter viftestart ──────────────
+- id: fogger_blocked_by_fan_trigger
+  alias: "Fogger — Blokkert av vifte (30s)"
+  trigger:
+    - platform: state
+      entity_id: switch.vifter_switch
+      to: "on"
+  action:
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.fogger_blocked_by_fan
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+    - delay:
+        seconds: 30
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.fogger_blocked_by_fan
+  mode: restart
+
+# ─── 2.4 Adaptiv retrigger — rask re-evaluering ved kritisk høy VPD ──────────
+# Når burst er ferdig og VPD fortsatt er kritisk høy (> target + 0.05),
+# re-evaluer umiddelbart uten ekstra cooldown.
+- id: fogger_adaptive_retrigger
+  alias: "Fogger — Adaptiv retrigger ved kritisk VPD"
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.fogger_burst
+  condition:
+    - condition: state
+      entity_id: input_boolean.system_enabled
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.fogger_lockout
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.fogger_blocked_by_fan
+      state: "off"
+    - condition: template
+      value_template: >
+        {{ states('sensor.chamber_avg_humidity') | float(0) < 98 }}
+    - condition: template
+      value_template: >
+        {% set vpd = states('sensor.chamber_current_vpd') | float(0) %}
+        {% set phase = states('input_boolean.pinning_phase') %}
+        {% set target = states('input_number.target_vpd_pinning') | float(0.10) if phase == 'on' else states('input_number.target_vpd_fruiting') | float(0.12) %}
+        {{ vpd > (target + 0.05) }}
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.fogger_switch
+    - service: timer.start
+      target:
+        entity_id: timer.fogger_burst
+      data:
+        duration: "{{ states('input_number.fogger_burst_duration') | int(14) }}"
+  mode: single
+  max_exceeded: silent
+
+# ─── 2.5 Fogger watchdog — 3 min maks ───────────────────────────────────────
+- id: fogger_watchdog_safety
+  alias: "Fogger — Watchdog (3 min)"
+  trigger:
+    - platform: state
+      entity_id: switch.fogger_switch
+      to: "on"
+      for:
+        minutes: 3
+  condition:
+    - condition: template
+      value_template: >
+        {% set vpd = states('sensor.chamber_current_vpd') | float(0) %}
+        {% set phase = states('input_boolean.pinning_phase') %}
+        {% set target = states('input_number.target_vpd_pinning') | float(0.10) if phase == 'on' else states('input_number.target_vpd_fruiting') | float(0.12) %}
+        {% set hyst = states('input_number.vpd_hysteresis') | float(0.01) %}
+        {{ vpd < (target - hyst) }}
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.fogger_burst
+    - service: notify.mobile_app_notify
+      data:
+        title: "⚠️ Fogger watchdog"
+        message: "Fogger var PÅ i 3+ min — tvunget AV. VPD={{ states('sensor.chamber_current_vpd') }} kPa"
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── 2.6 RH hard cutoff — safety override ────────────────────────────────────
+- id: fogger_rh_hard_cutoff
+  alias: "Fogger — RH hard cutoff (>98%)"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.chamber_avg_humidity
+      above: 98
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.fogger_burst
+  mode: single

@@ -1,4 +1,4 @@
-# VPD Control System v3.1.0 - File Manifest
+# HAB-9 VPD Control System v2.0.0 - File Manifest
 
 ## Package Contents
 
@@ -69,84 +69,76 @@ This package contains a complete VPD (Vapor Pressure Deficit) control system for
 
 ## 🔧 Configuration Files
 
-### automations_vpd_v3.yaml
-**Home Assistant automations**
-- VPD Control: Fogger Burst (10s every 2 min)
-- VPD Control: Emergency Stop
-- Ventilation: Time Pattern (every 5 min)
-- VPD System: Auto-start on boot
-- VPD System: Enable automations on system ON
-- VPD Alerts: Mobile notifications (3x)
-- Chamber: Maximum RH Safety
+### automations.yaml
+**Hjem-automasjoner + HAB-9 systemlivssyklus og varsler**
+- System: startup, start, stop
+- VPD-varsler: kritisk høy/lav VPD, fogger inaktiv, vifte inaktiv
+- Fase-styring: pinning 48h auto-retur
+- Anomali-deteksjon: temp/RH-endring, sensor offline, temp/RH utenfor område
+- Daglig morgenrapport
+- Hjem-automasjoner (varmepumpe, biler, personer)
 
-**⚠️ IMPORTANT:**
-- Replace entity_ids before use:
-  - `switch.luftfukter` → your fogger switch
-  - `switch.hvit_vifte_switch` → your fan switch
-- Append to existing automations.yaml (don't replace)
+### fogger.yaml *(ny i v2.0)*
+**All fogger-logikk — VPD-first med safety overrides**
+- `fogger_vpd_control` — Event-trigger på VPD state change (erstatter polling)
+- `fogger_burst_end` — Auto-off etter `fogger_burst_duration` sekunder
+- `fogger_blocked_by_fan_trigger` — Anti-oscillasjon 30s etter viftestart
+- `fogger_adaptive_retrigger` — Rask retrigger ved VPD > target + 0.05 kPa
+- `fogger_watchdog_safety` — Tvang-OFF etter 3 min (ned fra 10 min)
+- `fogger_rh_hard_cutoff` — RH > 98% → fogger OFF umiddelbart (ingen conditions)
 
-**Lines of code:** ~760
-**Automations:** 10
+### ventilation.yaml *(ny i v2.0)*
+**Ventilasjonssyklus — forenklet fra 4 automasjoner til 1**
+- `ventilation_cycle_sequence` — Sekvens: burst1 → pause → burst2 → restart timer
+- `ach_sync` — Restart syklus ved ACH- eller fan_total_on_time-endring
+- `ventilation_timer_idle_watchdog` — Recovery ved 10 min idle timer
+- `fan_watchdog_safety` — Tvang-OFF etter 90s kjøretid
+
+### power_safety.yaml *(ny i v2.0)*
+**Power-verifisering for vifte og fogger**
+- `fan_power_failure` — Underpower → OFF + restart syklus
+- `fan_overpower` — Overpower → OFF + varsling
+- `fogger_power_failure` — Underpower → lockout + varsling
+- `fogger_overpower` — Overpower → OFF + varsling
+- `fogger_lockout_reset` — Lockout reset etter timer
 
 ### configuration_vpd_sensors.yaml
-**Template sensors for VPD calculations**
-- Chamber Avg Temp (average of 3 sensors)
-- Chamber Avg Humidity (average of 3 sensors)
-- Chamber Current VPD (calculated)
-- Dynamic RH Setpoint (calculated)
-- VPD Stability Score (0-100%)
-- Climate Health Score (0-100%)
-- Humidity Control Efficiency
-- Humidifier Runtime Percent
-- ACH Actual
-
-**⚠️ IMPORTANT:**
-- Replace entity_ids before use:
-  - `sensor.temp_sensor_1/2/3` → your temp sensors
-  - `sensor.humidity_sensor_1/2/3` → your humidity sensors
-- Merge into existing configuration.yaml under `template:` section
-
-**Lines of code:** ~300
-**Sensors:** 12
+**Template-sensorer, statistikk og HA-integrasjoner**
+- Chamber Avg Temp (2x Aqara T1, fallback: kammeret)
+- Chamber Avg Humidity (2x Aqara T1 +3% kalibrering)
+- Chamber Current VPD (Magnus-formel)
+- Ventilation Status, VPD Control Status, VPD Alert Status
+- Sensor Health Status
+- Rate-of-change sensorer (temp/RH 5 min)
+- Statistics sensorer (24h snitt, 3h std dev)
+- VPD In Range binary sensor
 
 ### input_numbers_vpd.yaml
-**VPD system parameters**
-- target_vpd_pinning (0.15 kPa)
-- target_vpd_fruiting (0.20 kPa)
-- vpd_hysteresis (0.03 kPa)
-- ventilation_on_duration_pinning (40s)
-- ventilation_on_duration_fruiting (65s)
-
-**Usage:**
-- Copy to `/config/input_numbers_vpd.yaml`
-- Add to configuration.yaml: `input_number: !include input_numbers_vpd.yaml`
-
-**Lines of code:** ~50
-**Parameters:** 5
+**Alle konfigurerbare parametere**
+- VPD-mål: `target_vpd_pinning` (0.10), `target_vpd_fruiting` (0.12)
+- `vpd_hysteresis` (0.01 kPa)
+- ACH: `ach_target_pinning` (6), `ach_target_fruiting` (7)
+- `fogger_burst_duration` (14s), `fan_total_on_time` (120s)
+- Power-grenser: `fan_power_min/max`, `fogger_power_min/max`
+- `power_check_delay` (5s), `fogger_lockout_time` (120s)
 
 ### input_booleans_vpd.yaml
-**VPD system toggles**
-- ventilation_pulse_mode (System ON/OFF)
-- pinning_phase (Pinning/Fruiting toggle)
+**System-toggles**
+- `system_enabled` — Master ON/OFF
+- `pinning_phase` — Pinning/Fruiting fase-toggle
+- `fogger_lockout` — Safety lockout (settes av power_safety)
+- `fogger_blocked_by_fan` — Anti-oscillasjon (settes av fogger automation)
 
-**Usage:**
-- Copy to `/config/input_booleans_vpd.yaml`
-- Add to configuration.yaml: `input_boolean: !include input_booleans_vpd.yaml`
-
-**Lines of code:** ~10
-**Toggles:** 2
+### timer_vpd.yaml
+**Timere**
+- `ventilation_cycle` — Ventilasjonssyklus-timer
+- `fogger_burst` — Begrenser enkelt-burst til `fogger_burst_duration`
+- `fogger_lockout_timer` — Teller ned lockout-perioden
+- `pinning_phase_countdown` — 48h auto-retur fra pinning
 
 ### scripts_vpd.yaml
-**Helper scripts**
-- vpd_enable_all_automations (manual enable button)
-- vpd_force_restart (full system restart)
-
-**Usage:**
-- Merge into `/config/scripts.yaml`
-- Or copy entire file if scripts.yaml is empty (`{}`)
-
-**Lines of code:** ~55
-**Scripts:** 2
+**Hjelpeskripter**
+- `vpd_force_restart` — Full system restart
 
 ---
 
@@ -299,10 +291,8 @@ This package contains a complete VPD (Vapor Pressure Deficit) control system for
 
 ## 📦 Package Version
 
-**Version:** 3.1.0
-**Release Date:** 2025-12-17
-**Package Format:** ZIP (Windows) / TAR.GZ (Linux/Mac)
-**Compression:** DEFLATE / GZIP
+**Version:** 2.0.0
+**Release Date:** 2026-04-27
 
 ---
 

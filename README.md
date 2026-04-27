@@ -1,4 +1,4 @@
-# VPD Control System v3 - Complete Documentation
+# HAB-9 VPD Control System v2.0 - Complete Documentation
 
 > **Mushroom Cultivation Climate Control System**
 > Automatic VPD (Vapor Pressure Deficit), Temperature & Humidity Management
@@ -23,22 +23,25 @@
 
 ## 🎯 System Overview
 
-The VPD Control System v3 is a comprehensive climate control solution for mushroom cultivation chambers. It maintains optimal growing conditions by automatically controlling:
+HAB-9 VPD Control System er et klimakontrollsystem for soppdyrkingskammere. Systemet bruker **VPD-first med safety overrides** som arkitekturprinsipp.
 
-- **VPD (Vapor Pressure Deficit)**: Air drying power measurement (kPa)
-- **Humidity**: Relative humidity percentage
-- **Temperature**: Monitored (passive control)
-- **Ventilation**: Fresh air exchange (ACH - Air Changes per Hour)
+### Kontrollhierarki
+
+```
+Prioritet 1 — Safety   →  overstyrer alt (RH > 98%, power-feil, lockout)
+Prioritet 2 — VPD      →  primær kontroll, event-drevet
+Prioritet 3 — ACH      →  ventilasjon, uavhengig syklus
+```
 
 ### Key Metrics
 
-| Phase | Temperature | Target VPD | Target RH | ACH | Fan on-tid/syklus |
-|-------|-------------|------------|-----------|-----|-------------------|
-| **Pinning** | 15°C | 0.10 kPa | ~94% | 6 | 120s / 480s |
-| **Fruiting** | 17°C | 0.12 kPa | ~93% | 7 | 120s / 394s |
+| Phase | Temperature | Target VPD | ACH | Fan on-tid |
+|-------|-------------|------------|-----|------------|
+| **Pinning** | 15°C | 0.10 kPa | 6 | 120s (konfigurerbar) |
+| **Fruiting** | 17°C | 0.12 kPa | 7 | 120s (konfigurerbar) |
 
-> **ACH-definisjon:** 1 ACH = 120s faktisk viftetid. ACH n = viften kjører n ganger per time.
-> OFF-tid = (3600/ACH) − 120s. Syklusen styres av `timer.ventilation_cycle`.
+> **Pause per halvburst:** `(3600/ACH − fan_total_on_time) / 2` sekunder.
+> Eksempel fruiting: `(3600/7 − 120) / 2 ≈ 197s` pause mellom burstene.
 
 ---
 
@@ -46,41 +49,47 @@ The VPD Control System v3 is a comprehensive climate control solution for mushro
 
 ### Core Features
 
+✅ **VPD-first kontroll (event-drevet)**
+- Fogger trigges på VPD state change — ingen polling, kortere reaksjonstid
+- Hysteresis-band (default ±0.01 kPa) forhindrer oscillasjon
+- Adaptiv retrigger: re-evaluer umiddelbart etter burst hvis VPD > target + 0.05 kPa
+
 ✅ **Dual-Phase Control**
-- Pinning Phase (15°C, 0.10 kPa VPD, 60s ventilation)
-- Fruiting Phase (17°C, 0.12 kPa VPD, 75s ventilation)
-- One-click phase toggle
-- 48-hour auto-return timer from pinning to fruiting
+- Pinning Phase (15°C, 0.10 kPa VPD, ACH 6)
+- Fruiting Phase (17°C, 0.12 kPa VPD, ACH 7)
+- One-click phase toggle, 48-timers auto-retur til fruiting
 
-✅ **Timer-basert ventilasjon**
-- `timer.ventilation_cycle` styrer syklusfrekvens
-- ACH justeres via UI — OFF-tid beregnes automatisk: `(3600/ACH) − 120s`
-- Fogger: 14s bursts (proaktiv burst etter ventilasjon også)
-- Viften går alltid nøyaktig 120s per syklus (1 ACH = 1 luftskifte)
+✅ **Anti-oscillasjon**
+- Fogger blokkert 30s etter viftestart (`input_boolean.fogger_blocked_by_fan`)
+- Forhindrer at vifteindusert VPD-spike trigger unødvendig fogging
 
-✅ **Smart Control Logic**
-- Hysteresis-based VPD control (±0.02 kPa dead zone)
-- Emergency stop hvis VPD faller for lavt
-- Dynamic RH setpoint calculation basert på temperatur
-- Proaktiv 14s fog-burst etter fan OFF (VPD ≥ target)
+✅ **Safety overrides (Prioritet 1)**
+- RH hard cutoff: fogger OFF umiddelbart ved RH > 98% (ingen conditions)
+- Power-feil: fogger/vifte OFF ved underpower eller overpower
+- Fogger lockout: aktiveres ved power-feil, resetter etter konfigurerbar tid
+- Fogger watchdog: 3 min maks (ned fra 10 min)
+
+✅ **Power verification**
+- `sensor.vifter_power` og `sensor.fogger_power` verifisert etter oppstart
+- Underpower → OFF. Fogger: lockout aktiveres
+- Overpower → OFF + varsling
+- Alle grenser konfigurerbare via input_number
+
+✅ **Forenklet ventilasjon**
+- ÉN automation + ÉN timer (erstatter 4 timer-automasjoner)
+- `fan_total_on_time` konfigurerbar (default 120s)
+- Sekvens: burst 1 → pause → burst 2 → restart timer
 
 ✅ **Trygg oppstart**
-- `startup_sensor_availability_check`: sjekker alle Aqara-sensorer 85s etter boot — blokkerer VPD-systemet og varsler mobil hvis noen er offline
-- `safety_fan_off_on_ha_start`: vifte + fogger AV ved boot, timer starter etter 90s (kun hvis sensorer OK)
-- `input_boolean.ventilation_pulse_mode` restorer forrige tilstand automatisk
+- Hardware OFF → 180s → system ON
+- Nullstiller `fogger_lockout` og `fogger_blocked_by_fan` ved boot
 
-✅ **Professional Monitoring**
-- Split-screen Mushroom dashboard with Grafana integration
-- Climate Health Score (0-100%)
-- VPD Stability Score (0-100%)
-- Real-time equipment status
-- Mobile push notifications for critical alerts
-
-✅ **Safety Features**
-- Emergency stop at 95% RH (condensation prevention)
-- VPD emergency stop (prevents over-humidification)
-- Equipment runtime tracking
-- Fogger malfunction detection
+✅ **Monitoring & varsling**
+- VPD kritisk høy (>0.35 kPa i 15 min)
+- Fogger inaktiv 30 min ved høy VPD
+- Vifte inaktiv lenger enn forventet ACH-intervall
+- Anomali-deteksjon: rask temp/fuktighetsendring, sensor offline, temp/RH utenfor område
+- Daglig morgenrapport kl 08:00
 
 ---
 
@@ -206,18 +215,18 @@ BOOT → Auto-start (45s delay) → Enable Automations → Start System
 
 ### Step 1: File Structure
 
-Extract all files to your Home Assistant configuration directory:
-
 ```
 /config/
-├── automations.yaml              # VPD automations (merge with existing)
-├── configuration.yaml            # Template sensors (merge with existing)
-├── input_numbers_vpd.yaml        # VPD parameters
-├── input_booleans_vpd.yaml       # Phase toggles
-├── timer_vpd.yaml                # Timers (legacy, not used in v3)
-├── scripts.yaml                  # Helper scripts
-├── vpd_dashboard_split_screen_pro.yaml  # Lovelace dashboard
-└── grafana_vpd_dashboard.json    # Grafana dashboard config
+├── automations.yaml                  # Hjem-automasjoner, varsler, systemlivssyklus
+├── fogger.yaml                       # All fogger-logikk (VPD-trigger, safety, watchdog)
+├── ventilation.yaml                  # Ventilasjonssyklus (sekvens-automation)
+├── power_safety.yaml                 # Power-verifisering for vifte og fogger
+├── configuration_vpd_sensors.yaml    # Template-sensorer, statistikk, integrasjoner
+├── input_numbers_vpd.yaml            # VPD-parametere og power-grenser
+├── input_booleans_vpd.yaml           # System-toggles, lockout, anti-oscillasjon
+├── timer_vpd.yaml                    # Timere
+├── scripts_vpd.yaml                  # Hjelpeskripter
+└── hab9_climate_dashboard.yaml       # Lovelace dashboard
 ```
 
 ### Step 2: Merge Configuration Files
@@ -845,44 +854,68 @@ climate_health = (vpd_score × 0.4) + (rh_score × 0.4) + (temp_score × 0.2)
 
 ### Entity ID Reference
 
-**Sensors:**
-- `sensor.chamber_avg_temp` - Average of 2 chamber temp sensors (Aqara T1)
-- `sensor.chamber_avg_humidity` - Average of 2 chamber humidity sensors (Aqara T1)
-- `sensor.chamber_current_vpd` - Calculated VPD from avg temp/humidity (kPa)
-- `sensor.incubation_avg_temp` - Average of 2 incubation temp sensors (Sonoff SNZB-02P)
-- `sensor.incubation_avg_humidity` - Average of 2 incubation humidity sensors (Sonoff SNZB-02P)
-- `sensor.dynamic_rh_setpoint` - Target RH based on temp & phase
-- `sensor.vpd_stability_score` - VPD stability (0-100%)
-- `sensor.climate_health_score` - Overall health (0-100%)
-- `sensor.humidity_control_efficiency` - RH control efficiency
-- `sensor.humidifier_runtime_percent` - Fogger runtime estimate
+**Sensorer (hardware):**
+- `sensor.chamber_sensor_1_temperature` / `sensor.chamber_sensor_1_humidity` — Aqara T1 (primær)
+- `sensor.chamber_sensor_2_temperature` / `sensor.chamber_sensor_2_humidity` — Aqara T1 (primær)
+- `sensor.kammeret_temperature` / `sensor.kammeret_humidity` — Fallback
+- `sensor.vifter_power` — Effektmåling vifte
+- `sensor.fogger_power` — Effektmåling fogger
 
-**Controls:**
-- `input_boolean.ventilation_pulse_mode` - System ON/OFF
-- `input_boolean.pinning_phase` - Phase toggle
-- `input_number.target_vpd_pinning` - Target VPD pinning
-- `input_number.target_vpd_fruiting` - Target VPD fruiting
-- `input_number.vpd_hysteresis` - Hysteresis (kPa)
-- `input_number.ach_target_pinning` - ACH pinning (frekvens)
-- `input_number.ach_target_fruiting` - ACH fruiting (frekvens)
-- `input_number.ventilation_on_duration_pinning` - Fan on-tid pinning (fast: 120s)
-- `input_number.ventilation_on_duration_fruiting` - Fan on-tid fruiting (fast: 120s)
-- `timer.ventilation_cycle` - Aktiv nedtelling til neste syklus
+**Beregnede sensorer:**
+- `sensor.chamber_avg_temp` — Gjennomsnitt av T1-sensorer (med bounds-sjekk)
+- `sensor.chamber_avg_humidity` — Gjennomsnitt av T1-sensorer (+3% kalibrering)
+- `sensor.chamber_current_vpd` — VPD beregnet fra Magnus-formel
+- `sensor.incubation_avg_temp` / `sensor.incubation_avg_humidity` — Inkubasjon (kun monitoring)
+
+**Kontroll (input_boolean):**
+- `input_boolean.system_enabled` — Master ON/OFF
+- `input_boolean.pinning_phase` — Pinning/Fruiting fase-toggle
+- `input_boolean.fogger_lockout` — Safety lockout (aktiveres ved power-feil)
+- `input_boolean.fogger_blocked_by_fan` — Anti-oscillasjon (30s blokkering)
+
+**Kontroll (input_number):**
+- `input_number.target_vpd_pinning` / `target_vpd_fruiting` — VPD-mål per fase
+- `input_number.vpd_hysteresis` — Hysteresebånd (kPa)
+- `input_number.ach_target_pinning` / `ach_target_fruiting` — ACH per fase
+- `input_number.fogger_burst_duration` — Burst-varighet (default 14s)
+- `input_number.fan_total_on_time` — Total ON-tid per syklus (default 120s)
+- `input_number.fan_power_min` / `fan_power_max` — Power-grenser vifte
+- `input_number.fogger_power_min` / `fogger_power_max` — Power-grenser fogger
+- `input_number.power_check_delay` — Forsinkelse før power-sjekk
+- `input_number.fogger_lockout_time` — Lockout-varighet ved feil
+
+**Timere:**
+- `timer.ventilation_cycle` — Aktiv nedtelling til neste ventilasjonssyklus
+- `timer.fogger_burst` — Begrenser fogger-burst til `fogger_burst_duration`
+- `timer.fogger_lockout_timer` — Teller ned lockout-perioden
 
 **Switches:**
-- `switch.fogger_switch` - Fogger (ZHA Zigbee)
-- `switch.vifter_switch` - Extraction fan (ZHA Zigbee)
-- `light.fruktenkammer` - Grow light
+- `switch.fogger_switch` — Fogger (ZHA Zigbee)
+- `switch.vifter_switch` — Vifte (ZHA Zigbee)
+- `light.fruktenkammer` — Vekstlys
 
-**Automations:**
-- `automation.vpd_control_fogger_burst_v3` - Fogger 14s bursts (VPD > target, fail-safe off ved unavailable)
-- `automation.vpd_control__emergency_stop_v3` - Emergency stop
-- `automation.ventilation_timer_v4` - Timer-basert ventilasjon (primær syklusdrift)
-- `automation.vpd_control_fog_after_ventilation` - Proaktiv fog-burst etter fan OFF
-- `automation.fan_watchdog_safety` - **Lag 1**: Fan stuck ON >150s → turn off + restart timer
-- `automation.ventilation_timer_idle_watchdog` - **Lag 3**: Timer idle >30 min → restart + push-varsling
-- `automation.safety_fan_off_on_ha_start` - Fan+fogger AV ved boot, timer-start etter 90s
-- `automation.startup_sensor_availability_check` - Blokkerer VPD-system og varsler mobil hvis sensorer offline 85s etter boot
+**Automasjoner (fordelt på filer):**
+
+*fogger.yaml:*
+- `fogger_vpd_control` — Primær VPD-trigger (event-drevet)
+- `fogger_burst_end` — Auto-off etter burst
+- `fogger_blocked_by_fan_trigger` — Anti-oscillasjon 30s
+- `fogger_adaptive_retrigger` — Rask retrigger ved kritisk VPD
+- `fogger_watchdog_safety` — 3 min watchdog
+- `fogger_rh_hard_cutoff` — RH > 98% → OFF umiddelbart
+
+*ventilation.yaml:*
+- `ventilation_cycle_sequence` — Én sekvens-automation (erstatter 4)
+- `ach_sync` — Restart syklus ved ACH-endring
+- `ventilation_timer_idle_watchdog` — 10 min idle recovery
+- `fan_watchdog_safety` — 90s maks fan-kjøretid
+
+*power_safety.yaml:*
+- `fan_power_failure` — Vifte underpower → OFF + restart syklus
+- `fan_overpower` — Vifte overpower → OFF
+- `fogger_power_failure` — Fogger underpower → lockout
+- `fogger_overpower` — Fogger overpower → OFF
+- `fogger_lockout_reset` — Reset lockout etter timer
 
 ---
 

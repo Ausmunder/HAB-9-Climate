@@ -1,3 +1,20 @@
+# automations.yaml
+# Inneholder: hjem-automasjoner, VPD-varsler, fase-styring, anomali-deteksjon,
+#             daglig rapport, systemlivssyklus, og lysstyring.
+#
+# FJERNET (erstattet av fogger.yaml / ventilation.yaml / power_safety.yaml):
+#   - fogger_control_loop       → fogger.yaml: fogger_vpd_control
+#   - fogger_burst_cap          → fogger.yaml: fogger_burst_end
+#   - fogger_watchdog_safety    → fogger.yaml: fogger_watchdog_safety
+#   - fan_watchdog_safety       → ventilation.yaml: fan_watchdog_safety
+#   - ventilation_timer_idle_watchdog → ventilation.yaml: ventilation_timer_idle_watchdog
+#   - ventilation_cycle_end     → ventilation.yaml: ventilation_cycle_sequence
+#   - fan_on_timer_end          → ventilation.yaml: ventilation_cycle_sequence
+#   - fan_burst_pause_end       → ventilation.yaml: ventilation_cycle_sequence
+#   - fan_on_2_timer_end        → ventilation.yaml: ventilation_cycle_sequence
+#   - ach_sync                  → ventilation.yaml: ach_sync
+#   - Chamber Maximum RH Safety → fogger.yaml: fogger_rh_hard_cutoff
+
 - id: '1706189744048'
   alias: HASS Shutdown notification
   description: ''
@@ -531,30 +548,6 @@
       entity_id: switch.aeotec_heavy_duty_switch
     action: switch.turn_on
   mode: single
-- alias: Chamber - Maximum RH Safety
-  description: Emergency stop at 98% RH to prevent condensation
-  mode: single
-  trigger:
-  - platform: numeric_state
-    entity_id: sensor.chamber_avg_humidity
-    above: 98
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.fogger_switch
-  - service: persistent_notification.create
-    data:
-      title: '⚠️ HIGH ALARM: RH Too High'
-      message: 'Humidity at {{ states(''sensor.chamber_avg_humidity'') }}% -  humidifier
-        stopped. Check ventilation!
-
-        '
-      notification_id: high_rh_alarm
-  id: 8a37d4381ae74998aaa32f4492e9993c
 - id: 'sopp_tracker_frontend_autostart'
   alias: 'Sopp Tracker: Auto-start frontend ved HASS oppstart'
   description: Starter Sopp Tracker frontend automatisk når Home Assistant restarter
@@ -572,6 +565,9 @@
       message: 'Sopp Tracker frontend is now running on http://192.168.1.251:3001'
       notification_id: sopp_tracker_frontend_start
   mode: single
+# ═══════════════════════════════════════════════════════════════════════════════
+# VPD ALERTS
+# ═══════════════════════════════════════════════════════════════════════════════
 - id: 'vpd_critical_alert_mobile'
   alias: 'VPD Alert: Critical VPD Mobile Notification'
   description: Sender push til mobil når VPD er kritisk høy i 15 minutter
@@ -618,7 +614,7 @@
   mode: single
 - id: fogger_inactivity_alert
   alias: 'VPD Alert: Fogger Inaktiv 30 min'
-  description: Varsler hvis foggeren ikke har slått seg på på 30 minutter OG VPD er over mål — forhindrer falsk alarm når VPD er bra
+  description: Varsler hvis foggeren ikke har slått seg på på 30 minutter OG VPD er over mål
   trigger:
   - platform: state
     entity_id: switch.fogger_switch
@@ -681,7 +677,7 @@
         Ventilasjonsviften har ikke slått seg på på over
         {{ ((3600 / (states('input_number.ach_target_fruiting') | float(7)) - 120 + 90) / 60) | int }} min.
         (Forventet intervall ved ACH {{ states('input_number.ach_target_fruiting') | int }}: ~{{ (3600 / (states('input_number.ach_target_fruiting') | float(7)) / 60) | int }} min)
-        Sjekk ventilation_cycle_end og Zigbee-tilkobling!
+        Sjekk ventilation_cycle_sequence og Zigbee-tilkobling!
       data:
         priority: high
         channel: VPD_Alerts
@@ -708,7 +704,7 @@
       title: 'Pinning Phase Aktivert'
       message: >
         Pinning phase startet. Automatisk retur til fruiting om 48 timer.
-        VPD Target: {{ states('input_number.target_vpd_pinning') }} kPa | Temp: 15°C | Ventilasjon: 120s, ACH {{ states('input_number.ach_target_pinning') | int }}
+        VPD Target: {{ states('input_number.target_vpd_pinning') }} kPa | Temp: 15°C | ACH {{ states('input_number.ach_target_pinning') | int }}
       data:
         priority: normal
         channel: VPD_Phase
@@ -734,7 +730,7 @@
       title: 'Pinning Fullfort - Fruiting Aktivert'
       message: >
         48-timers pinning phase fullfort. System automatisk byttet til fruiting.
-        Nye innstillinger: VPD {{ states('input_number.target_vpd_fruiting') }} kPa | Temp: 17°C | Ventilasjon: 120s, ACH {{ states('input_number.ach_target_fruiting') | int }}
+        Nye innstillinger: VPD {{ states('input_number.target_vpd_fruiting') }} kPa | Temp: 17°C | ACH {{ states('input_number.ach_target_fruiting') | int }}
       data:
         priority: high
         channel: VPD_Phase
@@ -943,7 +939,7 @@
         — Snitt siste 24t —
         VPD: {{ states('sensor.vpd_24h_mean') }} kPa (mål: {{ '0.10' if is_state('input_boolean.pinning_phase', 'on') else '0.12' }})
         Temp: {{ states('sensor.temp_24h_mean') }}°C
-        RH: {{ states('sensor.humidity_24h_mean') }}% (mål: {{ states('sensor.dynamic_rh_setpoint') }}%)
+        RH: {{ states('sensor.humidity_24h_mean') }}%
 
         {{ 'Pinning (15°C)' if is_state('input_boolean.pinning_phase', 'on') else 'Fruiting (17°C)' }}
         {% if is_state('input_boolean.pinning_phase', 'on') and is_state('timer.pinning_phase_countdown', 'active') %}
@@ -964,336 +960,14 @@
           uri: "/lovelace/vpd-climate"
   mode: single
 # ═══════════════════════════════════════════════════════════════════════════════
-# SAFETY AUTOMATIONS (imported from legacy automations.yaml)
+# SYSTEM LIFECYCLE
 # ═══════════════════════════════════════════════════════════════════════════════
-- id: fogger_watchdog_safety
-  alias: 'Fogger Watchdog: Safety Shutoff'
-  description: >
-    Safety: slår av fogger automatisk hvis den har stått på i 10+ min mens VPD
-    allerede er under target (= fogger er fastlåst åpen). Ikke design for burst-modus
-    – fogger_control_loop styrer normal drift.
-  trigger:
-  - platform: state
-    entity_id: switch.fogger_switch
-    to: 'on'
-    for:
-      minutes: 10
-  condition:
-  - condition: template
-    value_template: >
-      {% set vpd = states('sensor.chamber_current_vpd') | float(-1) %}
-      {% if vpd < 0 %}
-        false
-      {% else %}
-        {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-        {% set target = states('input_number.target_vpd_pinning' if is_pinning else 'input_number.target_vpd_fruiting') | float(0.12) %}
-        {% set hyst = states('input_number.vpd_hysteresis') | float(0.02) %}
-        {{ vpd < (target - hyst) }}
-      {% endif %}
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.fogger_switch
-  - service: notify.mobile_app_pixel_9a
-    data:
-      title: '⚠️ Fogger Watchdog'
-      message: >
-        Fogger fastlåst ON i 10+ min mens VPD={{ states('sensor.chamber_current_vpd') }} kPa
-        (under target). Tvangsstopp utført.
-      data:
-        priority: high
-        channel: VPD_Alerts
-  mode: single
-- id: fan_watchdog_safety
-  alias: 'Fan Watchdog: Safety Shutoff'
-  description: >
-    Slår av ventilasjonsviften automatisk hvis den har stått på lengre enn 90s
-    (failsafe - normal on_duration 60s + 30s margin). Avbryter alle fan-timere og
-    restarter timer.ventilation_cycle slik at ventilasjonssyklusen ikke stopper permanent.
-  trigger:
-  - platform: state
-    entity_id: switch.vifter_switch
-    to: 'on'
-    for:
-      seconds: 90
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.vifter_switch
-  - service: timer.cancel
-    target:
-      entity_id:
-      - timer.fan_on
-      - timer.fan_burst_pause
-      - timer.fan_on_2
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  - service: timer.start
-    target:
-      entity_id: timer.ventilation_cycle
-    data:
-      duration: >
-        {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
-        {% set ach = states(ach_entity) | float(7) %}
-        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
-        {{ [half_sec, 15] | max }}
-  - service: notify.mobile_app_pixel_9a
-    data:
-      title: '⚠️ Fan Watchdog aktivert'
-      message: >
-        Viften var ON i >90s. Tvunget OFF + timer restartet kl {{ now().strftime('%H:%M') }}.
-      data:
-        priority: high
-        channel: VPD_Alerts
-  mode: single
-- id: ventilation_timer_idle_watchdog
-  alias: 'Ventilation: Timer Idle Watchdog (Lag 3)'
-  description: >
-    Evighetsmaskin-recovery: restarter timer.ventilation_cycle hvis den har vært idle
-    i 10 minutter mens system_enabled er ON. Normal maks idle-tid er 317s (~5.3 min:
-    fan_on 60s + fan_burst_pause 197s + fan_on_2 60s), så 10 min er 1.9× normalverdi
-    — aldri falske positiver, men fanger svikt 3× raskere enn tidligere terskel på 30 min.
-  trigger:
-  - platform: state
-    entity_id: timer.ventilation_cycle
-    to: idle
-    for:
-      minutes: 10
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  action:
-  - service: timer.start
-    target:
-      entity_id: timer.ventilation_cycle
-    data:
-      duration: "00:00:30"
-  - service: notify.mobile_app_pixel_9a
-    data:
-      title: '⚠️ Ventilasjon gjenopprettet automatisk'
-      message: >
-        timer.ventilation_cycle hadde stoppet (idle >30 min). Automatisk gjenstart
-        kl {{ now().strftime('%H:%M') }}. Sjekk HA-logger for rotårsak.
-      data:
-        priority: high
-        channel: VPD_Alerts
-  mode: single
-- id: ventilation_cycle_end
-  alias: 'Ventilation: Cycle End → Fan On (Burst 1)'
-  description: >
-    timer.ventilation_cycle utløper → fan ON + start timer.fan_on (60s, burst 1).
-    ACH-syklusen består av 2×60s med jevnt fordelt pause mellom. Ingen delay.
-  trigger:
-  - platform: event
-    event_type: timer.finished
-    event_data:
-      entity_id: timer.ventilation_cycle
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  action:
-  - service: switch.turn_on
-    target:
-      entity_id: switch.vifter_switch
-  - service: timer.start
-    target:
-      entity_id: timer.fan_on
-    data:
-      duration: "00:01:00"
-  mode: single
-- id: fan_on_timer_end
-  alias: 'Ventilation: Fan On Timer End (Burst 1) → Pause'
-  description: >
-    timer.fan_on (60s, burst 1) utløper → slå av fan, deretter start
-    timer.fan_burst_pause med halv off-tid = (3600/ACH - 120) / 2 sekunder.
-    fan_burst_pause_end tar over og starter burst 2.
-  trigger:
-  - platform: event
-    event_type: timer.finished
-    event_data:
-      entity_id: timer.fan_on
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.vifter_switch
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  - service: timer.start
-    target:
-      entity_id: timer.fan_burst_pause
-    data:
-      duration: >
-        {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
-        {% set ach = states(ach_entity) | float(7) %}
-        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
-        {{ [half_sec, 15] | max }}
-  mode: single
-- id: fan_burst_pause_end
-  alias: 'Ventilation: Burst Pause End → Fan On (Burst 2)'
-  description: >
-    timer.fan_burst_pause utløper → fan ON (burst 2) + start timer.fan_on_2 (60s).
-    Kun aktiv hvis system er på.
-  trigger:
-  - platform: event
-    event_type: timer.finished
-    event_data:
-      entity_id: timer.fan_burst_pause
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  action:
-  - service: switch.turn_on
-    target:
-      entity_id: switch.vifter_switch
-  - service: timer.start
-    target:
-      entity_id: timer.fan_on_2
-    data:
-      duration: "00:01:00"
-  mode: single
-- id: fan_on_2_timer_end
-  alias: 'Ventilation: Fan On Timer End (Burst 2) → Cycle Restart'
-  description: >
-    timer.fan_on_2 (60s, burst 2) utløper → slå av fan (alltid), deretter
-    restart timer.ventilation_cycle med halv off-tid = (3600/ACH - 120) / 2 sekunder.
-    Komplett ACH-syklus: ventilation_cycle → burst1 → pause → burst2 → ventilation_cycle.
-  trigger:
-  - platform: event
-    event_type: timer.finished
-    event_data:
-      entity_id: timer.fan_on_2
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.vifter_switch
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  - service: timer.start
-    target:
-      entity_id: timer.ventilation_cycle
-    data:
-      duration: >
-        {% set ach_entity = 'input_number.ach_target_pinning' if is_state('input_boolean.pinning_phase', 'on') else 'input_number.ach_target_fruiting' %}
-        {% set ach = states(ach_entity) | float(7) %}
-        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
-        {{ [half_sec, 15] | max }}
-  mode: single
-- id: fogger_burst_cap
-  alias: 'Fogger: Burst Cap (14s)'
-  description: >
-    timer.fogger_burst (14s) utløper → fogger OFF. Begrenser hvert fogger-puls til 14s
-    slik at damp rekker å blande seg med luft uten å saturere. fogger_control_loop
-    re-evaluerer ved neste 30s poll og starter ny burst hvis VPD fortsatt er høy.
-  trigger:
-  - platform: event
-    event_type: timer.finished
-    event_data:
-      entity_id: timer.fogger_burst
-  action:
-  - service: switch.turn_off
-    target:
-      entity_id: switch.fogger_switch
-  mode: single
-- id: fogger_control_loop
-  alias: 'Fogger: Control Loop'
-  description: >
-    Deterministisk fogger-styring: sjekk VPD hvert 30. sekund.
-    VPD > target+hyst → fogger ON. VPD < target-hyst → fogger OFF. Ellers ingen endring.
-    Erstatter vpd_control_fogger_burst_v3 + vpd_fog_after_ventilation + emergency_stop.
-  trigger:
-  - platform: time_pattern
-    seconds: /30
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  - condition: template
-    value_template: >
-      {{ states('sensor.chamber_current_vpd') not in ['unavailable', 'unknown'] }}
-  action:
-  - variables:
-      vpd: "{{ states('sensor.chamber_current_vpd') | float(0) }}"
-      target_vpd: >
-        {% if is_state('input_boolean.pinning_phase', 'on') %}
-          {{ states('input_number.target_vpd_pinning') | float(0.10) }}
-        {% else %}
-          {{ states('input_number.target_vpd_fruiting') | float(0.12) }}
-        {% endif %}
-      hyst: "{{ states('input_number.vpd_hysteresis') | float(0.02) }}"
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: "{{ vpd > (target_vpd + hyst) }}"
-      sequence:
-      - service: switch.turn_on
-        target:
-          entity_id: switch.fogger_switch
-      - service: timer.start
-        target:
-          entity_id: timer.fogger_burst
-        data:
-          duration: "00:00:14"
-    - conditions:
-      - condition: template
-        value_template: "{{ vpd < (target_vpd - hyst) }}"
-      sequence:
-      - service: switch.turn_off
-        target:
-          entity_id: switch.fogger_switch
-    default: []
-  mode: single
-- id: ach_sync
-  alias: 'ACH: Sync Cycle Timer on Change'
-  description: >
-    Trigger på begge ACH-entiteter. Condition filtrerer at kun aktiv fase er relevant.
-    Avbryter pågående burst-sekvens og restarter ventilation_cycle med ny half_sec
-    = (3600/ACH - 120) / 2. Fan ON er 2×60s hardkodet.
-  trigger:
-  - trigger: state
-    entity_id:
-    - input_number.ach_target_pinning
-    - input_number.ach_target_fruiting
-  condition:
-  - condition: state
-    entity_id: input_boolean.system_enabled
-    state: 'on'
-  - condition: template
-    value_template: >
-      {% set is_pinning = is_state('input_boolean.pinning_phase', 'on') %}
-      {{ (is_pinning and trigger.entity_id == 'input_number.ach_target_pinning')
-         or (not is_pinning and trigger.entity_id == 'input_number.ach_target_fruiting') }}
-  action:
-  - service: timer.cancel
-    target:
-      entity_id:
-      - timer.fan_on
-      - timer.fan_burst_pause
-      - timer.fan_on_2
-  - service: switch.turn_off
-    target:
-      entity_id: switch.vifter_switch
-  - service: timer.start
-    target:
-      entity_id: timer.ventilation_cycle
-    data:
-      duration: >
-        {% set ach = trigger.to_state.state | float(7) %}
-        {% set half_sec = (((3600 / ach) - 120) / 2) | int %}
-        {{ [half_sec, 15] | max }}
-  mode: single
 - id: system_startup
   alias: 'System: Safe Startup'
   description: >
-    HA-restart: hardware OFF, system_enabled=false, vent 60s.
+    HA-restart: hardware OFF, system_enabled=false, vent 180s.
     Starter ALLTID system_enabled=true etter delay (trigger system_start).
-    Hvis sensorer fortsatt offline → varsle men blokker ikke start.
-    Fogger styres kun når VPD er tilgjengelig (fogger_control_loop condition),
+    Fogger styres kun når VPD er tilgjengelig (fogger_vpd_control condition),
     vifte sykler normalt uansett sensortilstand.
   trigger:
   - platform: homeassistant
@@ -1306,14 +980,16 @@
       - switch.fogger_switch
   - service: input_boolean.turn_off
     target:
-      entity_id: input_boolean.system_enabled
+      entity_id:
+        - input_boolean.system_enabled
+        - input_boolean.fogger_lockout
+        - input_boolean.fogger_blocked_by_fan
   - service: timer.cancel
     target:
       entity_id:
       - timer.ventilation_cycle
-      - timer.fan_on
-      - timer.fan_burst_pause
-      - timer.fan_on_2
+      - timer.fogger_burst
+      - timer.fogger_lockout_timer
   - delay:
       seconds: 180
   - service: input_boolean.turn_on
@@ -1340,9 +1016,7 @@
   mode: single
 - id: system_start
   alias: 'System: Start (system_enabled → on)'
-  description: >
-    Starter ventilasjonssyklusen og slår på lys når systemet aktiveres.
-    Erstatter ventilation_pulse_start.
+  description: Starter ventilasjonssyklusen og slår på lys når systemet aktiveres.
   trigger:
   - platform: state
     entity_id: input_boolean.system_enabled
@@ -1364,9 +1038,7 @@
   mode: single
 - id: system_stop
   alias: 'System: Stop (system_enabled → off)'
-  description: >
-    Kansellerer timere, slår av hardware og lys når systemet deaktiveres.
-    Erstatter ventilation_pulse_stop_v2 + vpd_system_disable_automations.
+  description: Kansellerer timere, slår av hardware og lys når systemet deaktiveres.
   trigger:
   - platform: state
     entity_id: input_boolean.system_enabled
@@ -1377,9 +1049,8 @@
     target:
       entity_id:
       - timer.ventilation_cycle
-      - timer.fan_on
-      - timer.fan_burst_pause
-      - timer.fan_on_2
+      - timer.fogger_burst
+      - timer.fogger_lockout_timer
   - service: switch.turn_off
     target:
       entity_id:
@@ -1396,6 +1067,9 @@
         priority: normal
         channel: VPD_System
   mode: single
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHAMBER LIGHTING
+# ═══════════════════════════════════════════════════════════════════════════════
 - id: chamber_light_on_morning
   alias: 'Chamber Light: Auto ON 06:00'
   description: Slår på lyset i kammeret automatisk kl 06:00

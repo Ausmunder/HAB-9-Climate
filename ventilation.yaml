@@ -1,0 +1,162 @@
+# Ventilation Control — ACH-basert syklus
+#
+# Modell: ÉN automation, ÉN timer (timer.ventilation_cycle)
+# Sekvens per syklus:
+#   1. Fan ON  (fan_total_on_time / 2 sekunder)
+#   2. Pause   ((cycle_time - fan_total_on_time) / 2 sekunder)
+#   3. Fan ON  (fan_total_on_time / 2 sekunder)
+#   4. Pause → restart timer
+#
+# Erstatter: ventilation_cycle_end, fan_on_timer_end,
+#            fan_burst_pause_end, fan_on_2_timer_end
+
+# ─── Ventilation sekvens ─────────────────────────────────────────────────────
+- id: ventilation_cycle_sequence
+  alias: "Ventilasjon — Syklussekvens"
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.ventilation_cycle
+  condition:
+    - condition: state
+      entity_id: input_boolean.system_enabled
+      state: "on"
+  action:
+    - variables:
+        phase: "{{ states('input_boolean.pinning_phase') }}"
+        ach: >
+          {{ states('input_number.ach_target_pinning') | float(6)
+             if states('input_boolean.pinning_phase') == 'on'
+             else states('input_number.ach_target_fruiting') | float(7) }}
+        fan_on_time: "{{ states('input_number.fan_total_on_time') | int(120) }}"
+        half_on: "{{ (states('input_number.fan_total_on_time') | int(120) / 2) | int }}"
+        pause: "{{ ((3600 / (states('input_number.ach_target_pinning') | float(6) if states('input_boolean.pinning_phase') == 'on' else states('input_number.ach_target_fruiting') | float(7))) - states('input_number.fan_total_on_time') | int(120)) / 2 | int | max(5) }}"
+    # Burst 1
+    - service: switch.turn_on
+      target:
+        entity_id: switch.vifter_switch
+    - delay:
+        seconds: "{{ half_on }}"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    # Pause
+    - delay:
+        seconds: "{{ pause }}"
+    # Burst 2
+    - service: switch.turn_on
+      target:
+        entity_id: switch.vifter_switch
+    - delay:
+        seconds: "{{ half_on }}"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    # Restart syklus
+    - service: timer.start
+      target:
+        entity_id: timer.ventilation_cycle
+      data:
+        duration: "{{ pause }}"
+  mode: single
+  max_exceeded: silent
+
+# ─── ACH-sync: restart ved parameterendring ──────────────────────────────────
+- id: ach_sync
+  alias: "Ventilasjon — ACH sync ved parameterendring"
+  trigger:
+    - platform: state
+      entity_id:
+        - input_number.ach_target_pinning
+        - input_number.ach_target_fruiting
+        - input_number.fan_total_on_time
+  condition:
+    - condition: state
+      entity_id: input_boolean.system_enabled
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.ventilation_cycle
+    - delay:
+        seconds: 2
+    - service: timer.start
+      target:
+        entity_id: timer.ventilation_cycle
+      data:
+        duration: >
+          {% set phase = states('input_boolean.pinning_phase') %}
+          {% set ach = states('input_number.ach_target_pinning') | float(6) if phase == 'on' else states('input_number.ach_target_fruiting') | float(7) %}
+          {% set fan_on = states('input_number.fan_total_on_time') | int(120) %}
+          {% set pause = ((3600 / ach - fan_on) / 2) | int | max(5) %}
+          {{ pause }}
+  mode: restart
+
+# ─── Ventilation idle watchdog ───────────────────────────────────────────────
+- id: ventilation_timer_idle_watchdog
+  alias: "Ventilasjon — Idle watchdog"
+  trigger:
+    - platform: state
+      entity_id: timer.ventilation_cycle
+      to: "idle"
+      for:
+        minutes: 10
+  condition:
+    - condition: state
+      entity_id: input_boolean.system_enabled
+      state: "on"
+    - condition: state
+      entity_id: switch.vifter_switch
+      state: "off"
+  action:
+    - service: timer.start
+      target:
+        entity_id: timer.ventilation_cycle
+      data:
+        duration: 30
+    - service: notify.mobile_app_notify
+      data:
+        title: "⚠️ Ventilasjon idle watchdog"
+        message: "timer.ventilation_cycle var idle i 10+ min — restartet"
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── Fan watchdog — maks kjøretid ────────────────────────────────────────────
+- id: fan_watchdog_safety
+  alias: "Vifte — Watchdog (maks kjøretid)"
+  trigger:
+    - platform: state
+      entity_id: switch.vifter_switch
+      to: "on"
+      for:
+        seconds: 90
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.ventilation_cycle
+    - delay:
+        seconds: 5
+    - service: timer.start
+      target:
+        entity_id: timer.ventilation_cycle
+      data:
+        duration: >
+          {% set phase = states('input_boolean.pinning_phase') %}
+          {% set ach = states('input_number.ach_target_pinning') | float(6) if phase == 'on' else states('input_number.ach_target_fruiting') | float(7) %}
+          {% set fan_on = states('input_number.fan_total_on_time') | int(120) %}
+          {{ ((3600 / ach - fan_on) / 2) | int | max(5) }}
+    - service: notify.mobile_app_notify
+      data:
+        title: "⚠️ Fan watchdog"
+        message: "Vifte var PÅ i 90+ sek — tvunget AV og syklus restartet"
+        data:
+          channel: VPD_Alerts
+  mode: single

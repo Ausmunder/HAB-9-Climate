@@ -1,8 +1,8 @@
 # VPD Control System - Input Numbers
-# ACH-definisjon: 1 ACH = 120s på-tid = én komplett luftutskifting (empirisk målt)
-# Fan ON-tid er hardkodet 120s. Off-tid = (3600/ACH) - 120 (beregnes i automations).
+# ACH-definisjon: 1 ACH = fan_total_on_time sekunder på-tid per syklus
+# Pause = (3600/ACH - fan_total_on_time) / 2 (beregnes i automations)
 
-# VPD-styring (DYNAMISK) - Optimalisert for 15°C/17°C
+# VPD-styring
 target_vpd_pinning:
   name: Target VPD Pinning Phase
   min: 0.05
@@ -21,7 +21,7 @@ target_vpd_fruiting:
   icon: mdi:mushroom
   initial: 0.12
 
-# ACH-styring (luftutskiftninger per time)
+# ACH-styring
 ach_target_pinning:
   name: ACH Target (Pinning)
   min: 2
@@ -49,3 +49,79 @@ vpd_hysteresis:
   unit_of_measurement: "kPa"
   icon: mdi:delta
   initial: 0.01
+
+# Fogger burst
+fogger_burst_duration:
+  name: Fogger Burst Duration
+  min: 2
+  max: 30
+  step: 1
+  unit_of_measurement: "s"
+  icon: mdi:water-pump
+  mode: slider
+  initial: 14
+
+# Ventilasjon
+fan_total_on_time:
+  name: Fan Total On Time
+  min: 20
+  max: 300
+  step: 10
+  unit_of_measurement: "s"
+  icon: mdi:fan-clock
+  initial: 120
+
+# Power safety
+fan_power_min:
+  name: Fan Power Min
+  min: 1
+  max: 50
+  step: 1
+  unit_of_measurement: "W"
+  icon: mdi:flash-alert
+  initial: 5
+
+fan_power_max:
+  name: Fan Power Max
+  min: 10
+  max: 200
+  step: 1
+  unit_of_measurement: "W"
+  icon: mdi:flash-alert
+  initial: 80
+
+fogger_power_min:
+  name: Fogger Power Min
+  min: 1
+  max: 50
+  step: 1
+  unit_of_measurement: "W"
+  icon: mdi:flash-alert
+  initial: 5
+
+fogger_power_max:
+  name: Fogger Power Max
+  min: 10
+  max: 200
+  step: 1
+  unit_of_measurement: "W"
+  icon: mdi:flash-alert
+  initial: 60
+
+power_check_delay:
+  name: Power Check Delay
+  min: 1
+  max: 30
+  step: 1
+  unit_of_measurement: "s"
+  icon: mdi:timer-check
+  initial: 5
+
+fogger_lockout_time:
+  name: Fogger Lockout Time
+  min: 30
+  max: 600
+  step: 30
+  unit_of_measurement: "s"
+  icon: mdi:lock-clock
+  initial: 120

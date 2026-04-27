@@ -1,0 +1,144 @@
+# Power Safety — Verifisering av fan og fogger strømforbruk
+#
+# Kontrollhierarki Prioritet 1 — Safety:
+#   Fogger og vifte slås alltid AV ved power-feil (under/overpower)
+
+# ─── 4.1 Fan failure (underpower) ────────────────────────────────────────────
+- id: fan_power_failure
+  alias: "Vifte — Power failure (underpower)"
+  trigger:
+    - platform: state
+      entity_id: switch.vifter_switch
+      to: "on"
+  action:
+    - delay:
+        seconds: "{{ states('input_number.power_check_delay') | int(5) }}"
+    - condition: template
+      value_template: >
+        {{ states('sensor.vifter_power') | float(0) < states('input_number.fan_power_min') | float(5)
+           and states('switch.vifter_switch') == 'on' }}
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.ventilation_cycle
+    - delay:
+        seconds: 5
+    - service: timer.start
+      target:
+        entity_id: timer.ventilation_cycle
+      data:
+        duration: >
+          {% set phase = states('input_boolean.pinning_phase') %}
+          {% set ach = states('input_number.ach_target_pinning') | float(6) if phase == 'on' else states('input_number.ach_target_fruiting') | float(7) %}
+          {% set fan_on = states('input_number.fan_total_on_time') | int(120) %}
+          {{ ((3600 / ach - fan_on) / 2) | int | max(5) }}
+    - service: notify.mobile_app_notify
+      data:
+        title: "⚠️ Vifte power failure"
+        message: "Vifte viste {{ states('sensor.vifter_power') }}W — under minimum {{ states('input_number.fan_power_min') }}W. Slått AV."
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── 4.2 Fan overpower ───────────────────────────────────────────────────────
+- id: fan_overpower
+  alias: "Vifte — Overpower"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.vifter_power
+      above: "{{ states('input_number.fan_power_max') | float(80) }}"
+      for:
+        seconds: 2
+  condition:
+    - condition: state
+      entity_id: switch.vifter_switch
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.vifter_switch
+    - service: notify.mobile_app_notify
+      data:
+        title: "🔴 Vifte overpower"
+        message: "Vifte viste {{ states('sensor.vifter_power') }}W — over max {{ states('input_number.fan_power_max') }}W. Slått AV."
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── 4.3 Fogger failure (underpower) → lockout ───────────────────────────────
+- id: fogger_power_failure
+  alias: "Fogger — Power failure (underpower) → lockout"
+  trigger:
+    - platform: state
+      entity_id: switch.fogger_switch
+      to: "on"
+  action:
+    - delay:
+        seconds: "{{ states('input_number.power_check_delay') | int(5) }}"
+    - condition: template
+      value_template: >
+        {{ states('sensor.fogger_power') | float(0) < states('input_number.fogger_power_min') | float(5)
+           and states('switch.fogger_switch') == 'on' }}
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.fogger_burst
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.fogger_lockout
+    - service: timer.start
+      target:
+        entity_id: timer.fogger_lockout_timer
+      data:
+        duration: "{{ states('input_number.fogger_lockout_time') | int(120) }}"
+    - service: notify.mobile_app_notify
+      data:
+        title: "🔴 Fogger power failure — lockout"
+        message: "Fogger viste {{ states('sensor.fogger_power') }}W — under minimum {{ states('input_number.fogger_power_min') }}W. Lockout aktivert i {{ states('input_number.fogger_lockout_time') | int }}s."
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── 4.4 Fogger overpower (safety) ───────────────────────────────────────────
+- id: fogger_overpower
+  alias: "Fogger — Overpower (safety)"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.fogger_power
+      above: "{{ states('input_number.fogger_power_max') | float(60) }}"
+  condition:
+    - condition: state
+      entity_id: switch.fogger_switch
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.fogger_switch
+    - service: timer.cancel
+      target:
+        entity_id: timer.fogger_burst
+    - service: notify.mobile_app_notify
+      data:
+        title: "🔴 Fogger overpower"
+        message: "Fogger viste {{ states('sensor.fogger_power') }}W — over max {{ states('input_number.fogger_power_max') }}W. Slått AV."
+        data:
+          channel: VPD_Alerts
+  mode: single
+
+# ─── 4.5 Fogger lockout reset ────────────────────────────────────────────────
+- id: fogger_lockout_reset
+  alias: "Fogger — Lockout reset"
+  trigger:
+    - platform: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.fogger_lockout_timer
+  action:
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.fogger_lockout
+  mode: single
